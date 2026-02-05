@@ -1,0 +1,5 @@
+export { default as SubProcessSettings } from './SubProcessSettings.vue'
+export { default as BasicInfoSettings } from './BasicInfoSettings.vue'
+export { default as FailureHandlingSettings } from './FailureHandlingSettings.vue'
+export { default as InputParamsSettings } from './InputParamsSettings.vue'
+export { default as OutputParamsSettings } from './OutputParamsSettings.vue'

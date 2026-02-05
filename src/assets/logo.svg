@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- 1. 背景层：纯白底色 -->
+  <rect width="200" height="200" fill="#ffffff"/>
+  
+  <!-- 2. 图形层：黑色线条，白色填充 -->
+  <g fill="#ffffff" stroke="#000000" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    
+    <!-- 连接线 (先绘制，位于底层，避免遮挡圆点) -->
+    <line x1="100" y1="100" x2="100" y2="40" />
+    <line x1="100" y1="100" x2="50" y2="150" />
+    <line x1="100" y1="100" x2="150" y2="150" />
+    
+    <!-- 节点 (后绘制，覆盖连接线端点) -->
+    <!-- 中心核心节点 -->
+    <circle cx="100" cy="100" r="20" />
+    
+    <!-- 三个辐射任务节点 -->
+    <circle cx="100" cy="40" r="12" />
+    <circle cx="50" cy="150" r="12" />
+    <circle cx="150" cy="150" r="12" />
+  </g>
+</svg>
