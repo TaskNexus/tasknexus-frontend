@@ -10,7 +10,25 @@
             </router-link>
         </div>
       </div>
-      <form class="mt-8 space-y-6" @submit.prevent="handleLogin">
+
+      <!-- Login Mode Tabs -->
+      <div class="flex border-b border-gray-200">
+        <button 
+          @click="loginMode = 'password'" 
+          :class="['flex-1 py-2 px-4 text-center font-medium text-sm transition-colors', loginMode === 'password' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
+        >
+          账号密码登录
+        </button>
+        <button 
+          @click="loginMode = 'qrcode'" 
+          :class="['flex-1 py-2 px-4 text-center font-medium text-sm transition-colors', loginMode === 'qrcode' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
+        >
+          飞书扫码登录
+        </button>
+      </div>
+
+      <!-- Password Login Form -->
+      <form v-if="loginMode === 'password'" class="mt-8 space-y-6" @submit.prevent="handleLogin">
         <input type="hidden" name="remember" value="true" />
         <div class="rounded-md shadow-sm -space-y-px">
           <div>
@@ -45,41 +63,78 @@
             Sign in
           </button>
         </div>
+
+        <!-- Divider -->
+        <div class="relative">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-gray-300"></div>
+          </div>
+          <div class="relative flex justify-center text-sm">
+            <span class="px-2 bg-white text-gray-500">或使用以下方式登录</span>
+          </div>
+        </div>
+
+        <!-- Feishu Login Button -->
+        <div>
+          <button @click="handleFeishuLogin" type="button" class="group relative w-full flex justify-center items-center gap-2 py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4.5 4.5L11 8.5V15.5L4.5 11.5V4.5Z" fill="#00D6B9"/>
+              <path d="M11 8.5L19.5 4.5V11.5L11 15.5V8.5Z" fill="#3370FF"/>
+              <path d="M4.5 11.5L11 15.5V19.5L4.5 15.5V11.5Z" fill="#00D6B9"/>
+              <path d="M11 15.5L19.5 11.5V15.5L11 19.5V15.5Z" fill="#3370FF"/>
+            </svg>
+            使用飞书登录
+          </button>
+        </div>
       </form>
 
-      <!-- Divider -->
-      <div class="relative">
-        <div class="absolute inset-0 flex items-center">
-          <div class="w-full border-t border-gray-300"></div>
+      <!-- QR Code Login -->
+      <div v-else class="mt-8 space-y-6">
+        <div class="text-center text-sm text-gray-500 mb-4">
+          请使用飞书 App 扫描二维码登录
         </div>
-        <div class="relative flex justify-center text-sm">
-          <span class="px-2 bg-white text-gray-500">或使用以下方式登录</span>
+        <!-- QR Code Container -->
+        <div class="flex justify-center">
+          <div id="feishu-qr-container" class="w-[300px] h-[300px] flex items-center justify-center bg-gray-50 rounded-lg">
+            <div v-if="qrLoading" class="text-gray-400">
+              <svg class="animate-spin h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <!-- Feishu Login Button -->
-      <div>
-        <button @click="handleFeishuLogin" type="button" class="group relative w-full flex justify-center items-center gap-2 py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M4.5 4.5L11 8.5V15.5L4.5 11.5V4.5Z" fill="#00D6B9"/>
-            <path d="M11 8.5L19.5 4.5V11.5L11 15.5V8.5Z" fill="#3370FF"/>
-            <path d="M4.5 11.5L11 15.5V19.5L4.5 15.5V11.5Z" fill="#00D6B9"/>
-            <path d="M11 15.5L19.5 11.5V15.5L11 19.5V15.5Z" fill="#3370FF"/>
-          </svg>
-          使用飞书登录
-        </button>
+        <div class="text-center text-xs text-gray-400">
+          扫码后请在手机上确认登录
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import axios from 'axios'
 
 const username = ref('')
 const password = ref('')
 const authStore = useAuthStore()
+const loginMode = ref<'password' | 'qrcode'>('password')
+const qrLoading = ref(true)
+const gotoUrl = ref('')
+
+declare global {
+  interface Window {
+    QRLogin: (options: {
+      id: string
+      goto: string
+      width: string
+      height: string
+      style?: string
+    }) => void
+  }
+}
 
 const handleLogin = async () => {
   await authStore.login({ username: username.value, password: password.value })
@@ -88,4 +143,98 @@ const handleLogin = async () => {
 const handleFeishuLogin = async () => {
   await authStore.loginWithFeishu()
 }
+
+// Load Feishu QR SDK
+const loadFeishuQRSDK = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (window.QRLogin) {
+      resolve()
+      return
+    }
+    
+    const script = document.createElement('script')
+    script.src = 'https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load Feishu QR SDK'))
+    document.head.appendChild(script)
+  })
+}
+
+// Initialize QR code login
+const initQRLogin = async () => {
+  qrLoading.value = true
+  
+  try {
+    // Load SDK
+    await loadFeishuQRSDK()
+    
+    // Get QR login URL from backend
+    const response = await axios.get('/api/auth/feishu/qr_login_url/')
+    gotoUrl.value = response.data.goto_url
+    
+    // Initialize QR code
+    window.QRLogin({
+      id: 'feishu-qr-container',
+      goto: gotoUrl.value,
+      width: '300',
+      height: '300',
+      style: 'border:none;background-color:#FFFFFF;'
+    })
+    
+    qrLoading.value = false
+  } catch (error) {
+    console.error('Failed to initialize QR login:', error)
+    qrLoading.value = false
+  }
+}
+
+// Handle message from QR code iframe
+const handleQRMessage = async (event: MessageEvent) => {
+  // Verify origin is from Feishu
+  if (!event.origin.includes('feishu.cn') && !event.origin.includes('larksuite.com')) {
+    return
+  }
+  
+  const data = event.data
+  console.log('Received QR message:', data, 'from origin:', event.origin)
+  
+  // Extract tmp_code - can be string or object {tmp_code, source}
+  let tmpCode: string | null = null
+  if (typeof data === 'string' && data.length > 0) {
+    tmpCode = data
+  } else if (data && typeof data === 'object' && data.tmp_code) {
+    tmpCode = data.tmp_code
+  }
+  
+  if (tmpCode) {
+    // Redirect to Feishu with tmp_code to complete authorization
+    const redirectUrl = `${gotoUrl.value}&tmp_code=${encodeURIComponent(tmpCode)}`
+    console.log('Redirecting to:', redirectUrl)
+    window.location.href = redirectUrl
+  }
+}
+
+
+// Watch for login mode changes
+watch(loginMode, (newMode) => {
+  if (newMode === 'qrcode') {
+    // Use setTimeout to ensure DOM is updated
+    setTimeout(() => {
+      initQRLogin()
+    }, 100)
+  }
+})
+
+onMounted(() => {
+  window.addEventListener('message', handleQRMessage)
+  
+  // If starting with QR mode, initialize it
+  if (loginMode.value === 'qrcode') {
+    initQRLogin()
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', handleQRMessage)
+})
 </script>
