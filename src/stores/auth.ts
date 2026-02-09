@@ -81,6 +81,33 @@ export const useAuthStore = defineStore('auth', {
             localStorage.removeItem('accessToken')
             localStorage.removeItem('refreshToken')
             router.push('/login')
+        },
+        async loginWithFeishu() {
+            try {
+                const response = await axios.get('/api/auth/feishu/login_url/')
+                window.location.href = response.data.authorize_url
+            } catch (error) {
+                console.error('Failed to get Feishu login URL', error)
+            }
+        },
+        async handleFeishuCallback(code: string) {
+            try {
+                const response = await axios.get(`/api/auth/feishu/callback/?code=${code}`)
+                this.accessToken = response.data.access
+                this.refreshToken = response.data.refresh
+
+                localStorage.setItem('accessToken', this.accessToken as string)
+                localStorage.setItem('refreshToken', this.refreshToken as string)
+
+                await this.fetchUser()
+
+                router.push('/')
+                return true
+            } catch (error) {
+                console.error('Feishu login callback failed', error)
+                router.push('/login')
+                return false
+            }
         }
     }
 })

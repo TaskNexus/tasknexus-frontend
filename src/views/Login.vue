@@ -46,6 +46,29 @@
           </button>
         </div>
       </form>
+
+      <!-- Divider -->
+      <div class="relative">
+        <div class="absolute inset-0 flex items-center">
+          <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center text-sm">
+          <span class="px-2 bg-white text-gray-500">或使用以下方式登录</span>
+        </div>
+      </div>
+
+      <!-- Feishu Login Button -->
+      <div>
+        <button @click="handleFeishuLogin" type="button" class="group relative w-full flex justify-center items-center gap-2 py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4.5 4.5L11 8.5V15.5L4.5 11.5V4.5Z" fill="#00D6B9"/>
+            <path d="M11 8.5L19.5 4.5V11.5L11 15.5V8.5Z" fill="#3370FF"/>
+            <path d="M4.5 11.5L11 15.5V19.5L4.5 15.5V11.5Z" fill="#00D6B9"/>
+            <path d="M11 15.5L19.5 11.5V15.5L11 19.5V15.5Z" fill="#3370FF"/>
+          </svg>
+          使用飞书登录
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -60,5 +83,9 @@ const authStore = useAuthStore()
 
 const handleLogin = async () => {
   await authStore.login({ username: username.value, password: password.value })
+}
+
+const handleFeishuLogin = async () => {
+  await authStore.loginWithFeishu()
 }
 </script>

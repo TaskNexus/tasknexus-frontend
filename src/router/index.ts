@@ -123,6 +123,11 @@ const router = createRouter({
       name: 'about',
       component: () => import('../views/AboutView.vue'),
     },
+    {
+      path: '/feishu-callback',
+      name: 'feishu-callback',
+      component: () => import('../views/FeishuCallback.vue'),
+    },
 
   ],
 })
