@@ -18,4 +18,13 @@ export default defineConfig({
   optimizeDeps: {
     include: ['@antv/x6', '@antv/x6-vue-shape'],
   },
+  server: {
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+      }
+    }
+  }
 })
