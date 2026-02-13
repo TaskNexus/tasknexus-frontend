@@ -6,7 +6,6 @@
           <h1 class="text-xl font-semibold text-gray-800">Platform Members</h1>
           <p class="text-sm text-gray-500">Manage platform users and their roles.</p>
       </div>
-      <!-- Add User Button (Maybe invite? For now just list) -->
     </div>
 
     <!-- Toolbar / Search -->
@@ -28,7 +27,6 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telegram</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
@@ -57,19 +55,6 @@
               >
                 {{ user.role }}
               </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <span v-if="user.telegram_username" class="text-green-600">
-                ✓ @{{ user.telegram_username }}
-              </span>
-              <button 
-                v-else-if="user.id === authStore.user?.id"
-                @click="openBindModal()"
-                class="text-blue-600 hover:text-blue-900"
-              >
-                Bind Telegram
-              </button>
-              <span v-else class="text-gray-400">-</span>
             </td>
              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ new Date(user.date_joined).toLocaleDateString() }}
@@ -116,26 +101,6 @@
         </div>
     </div>
 
-    <!-- Telegram Bind Modal -->
-    <div v-if="showBindModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div class="bg-white rounded-lg p-6 w-96">
-            <h3 class="text-lg font-medium mb-4">绑定 Telegram</h3>
-            <div v-if="bindCode" class="space-y-4">
-                <p class="text-gray-600">请在 Telegram 中向机器人发送以下命令：</p>
-                <div class="bg-gray-100 p-4 rounded-lg text-center">
-                    <code class="text-lg font-mono select-all">/bind {{ bindCode }}</code>
-                </div>
-                <p class="text-sm text-gray-500">验证码将在 5 分钟后过期</p>
-            </div>
-            <div v-else class="text-center py-4">
-                <span class="text-gray-500">正在生成验证码...</span>
-            </div>
-            <div class="mt-6 flex justify-end">
-                <button @click="closeBindModal" class="px-4 py-2 text-gray-700 border rounded-md hover:bg-gray-50">关闭</button>
-            </div>
-        </div>
-    </div>
-
   </div>
 </template>
 
@@ -151,10 +116,6 @@ const authStore = useAuthStore()
 
 const editingUser = ref<any>(null)
 const editFormRole = ref('MEMBER')
-
-// Telegram binding
-const showBindModal = ref(false)
-const bindCode = ref('')
 
 const fetchUsers = async () => {
     loading.value = true
@@ -173,15 +134,9 @@ const fetchUsers = async () => {
 const canManage = (targetUser: any) => {
     const currentUser = authStore.user
     if (!currentUser) return false
-    // Only Admin/Owner can manage
     if (currentUser.role !== 'ADMIN' && currentUser.role !== 'OWNER') return false
-    
-    // Cannot manage Owner
     if (targetUser.role === 'OWNER') return false
-    
-    // Admin cannot manage other Admins (optional rule, strictly safer)
     if (currentUser.role === 'ADMIN' && targetUser.role === 'ADMIN') return false
-    
     return true
 }
 
@@ -198,9 +153,6 @@ const saveRole = async () => {
     if (!editingUser.value) return
     try {
         const isStaff = editFormRole.value === 'ADMIN'
-        // We perform PATCH with is_staff
-        // Note: For OWNER, we can't really assign via this UI unless we are OWNER and logic allows.
-        // Assuming we only toggle Admin/Member.
         await axios.patch(`/api/auth/users/${editingUser.value.id}/`, {
             is_staff: isStaff
         })
@@ -222,29 +174,7 @@ const deleteUser = async (user: any) => {
     }
 }
 
-// Telegram binding functions
-const openBindModal = async () => {
-    showBindModal.value = true
-    bindCode.value = ''
-    try {
-        const response = await axios.post('/api/auth/telegram/generate-code/')
-        bindCode.value = response.data.code
-    } catch (e) {
-        console.error('Failed to generate bind code', e)
-        alert('生成验证码失败')
-        showBindModal.value = false
-    }
-}
-
-const closeBindModal = () => {
-    showBindModal.value = false
-    bindCode.value = ''
-    fetchUsers() // Refresh to see if binding succeeded
-}
-
 onMounted(() => {
-    // We assume the user store has 'role'. If not, we might need to fetch 'me' again or ensure it's in the store.
-    // Ideally authStore.user has the 'role' field we added to serializer.
     if (!authStore.user?.role) {
        authStore.fetchUser()
     }
