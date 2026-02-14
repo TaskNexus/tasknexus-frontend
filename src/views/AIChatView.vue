@@ -433,7 +433,7 @@ const sendMessage = async () => {
         }
         
         // Use fetch with streaming for SSE
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+        const baseUrl = import.meta.env.VITE_API_URL || ''
         const response = await fetch(`${baseUrl}/api/chat/completions/stream/`, {
             method: 'POST',
             headers: {

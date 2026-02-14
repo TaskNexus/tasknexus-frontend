@@ -3,7 +3,7 @@ import axios from 'axios'
 import router from '@/router'
 
 // Configure default axios base URL
-axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || ''
 
 axios.interceptors.request.use(config => {
     const token = localStorage.getItem('accessToken')
