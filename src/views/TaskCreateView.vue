@@ -386,6 +386,23 @@ const onWorkflowChange = () => {
     }
 }
 
+const applyReplayContext = () => {
+    const replayRaw = route.query.replay as string
+    if (!replayRaw) return
+    try {
+        const context = JSON.parse(decodeURIComponent(replayRaw))
+        if (context && typeof context === 'object') {
+            allParams.value.forEach(p => {
+                if (p.key in context) {
+                    p.runtimeValue = String(context[p.key])
+                }
+            })
+        }
+    } catch (e) {
+        console.error('Failed to parse replay context', e)
+    }
+}
+
 const fetchWorkflowDetails = async (id: number) => {
     loadingParams.value = true
     try {
@@ -448,6 +465,9 @@ const fetchWorkflowDetails = async (id: number) => {
         })
         
         allParams.value = params
+        
+        // Apply replay context if present
+        applyReplayContext()
         
     } catch (e) {
         console.error('Failed to fetch workflow details', e)

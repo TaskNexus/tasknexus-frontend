@@ -117,6 +117,7 @@
                      <td class="py-3 text-gray-500">{{ formatDate(task.finished_at) }}</td>
                      <td class="py-3 text-center space-x-2">
                          <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="viewDetail(task.id)">Detail</button>
+                         <button class="text-green-600 hover:text-green-800 text-xs font-medium" @click="replayTask(task)">Replay</button>
                          <button class="text-red-500 hover:text-red-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity" @click="deleteTask(task.id)">Delete</button>
                      </td>
                 </tr>
@@ -213,6 +214,21 @@ const viewDetail = (taskId: number) => {
 
 const goToWorkflow = (workflowId: number) => {
     router.push(`/workflows/${workflowId}`)
+}
+
+const replayTask = async (task: any) => {
+    try {
+        const { data } = await axios.get(`/api/tasks/${task.id}/`)
+        const context = data.context || {}
+        router.push({
+            name: 'task-create',
+            params: { workflowId: data.workflow },
+            query: { replay: encodeURIComponent(JSON.stringify(context)) }
+        })
+    } catch (e) {
+        console.error('Failed to fetch task for replay', e)
+        alert('获取任务信息失败')
+    }
 }
 
 // Deletion Logic
