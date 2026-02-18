@@ -47,6 +47,14 @@
                 @update:model-value="(val) => updateValue(input.key, val)"
             />
             
+            <!-- Array of Objects -->
+            <ObjectArrayInput
+                v-else-if="input.type === 'array'"
+                :model-value="values[input.key] || []"
+                :schema="input.schema"
+                @update:model-value="(val) => updateValue(input.key, val)"
+            />
+
             <!-- Boolean Checkbox -->
             <BooleanCheckbox
                 v-else-if="input.type === 'bool'"
@@ -73,7 +81,8 @@ import {
     UserMultiSelect,
     StringTextarea,
     BooleanCheckbox,
-    DefaultTextInput
+    DefaultTextInput,
+    ObjectArrayInput
 } from './inputs'
 
 interface InputDef {

@@ -175,7 +175,7 @@ const updateInputs = () => {
         inputs: { 
             ...nodeInputs.value
         }
-    })
+    }, { overwrite: true })
 }
 
 const updateOutputs = () => {
