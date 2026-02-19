@@ -164,6 +164,53 @@
                 </div>
             </div>
         </div>
+
+        <!-- Notification Settings Module -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4 flex items-center justify-between">
+                <span>Notification Settings</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="notifyEnabled" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    <span class="ml-2 text-sm text-gray-600">{{ notifyEnabled ? 'Enabled' : 'Disabled' }}</span>
+                </label>
+            </h2>
+
+            <div v-if="notifyEnabled" class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Notify Members</label>
+                    <div class="border border-gray-300 rounded-md p-2 max-h-48 overflow-y-auto">
+                        <div v-if="loadingUsers" class="text-center py-3">
+                            <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
+                            <p class="text-xs text-gray-500 mt-1">Loading users...</p>
+                        </div>
+                        <div v-else-if="userList.length === 0" class="text-center py-3">
+                            <p class="text-sm text-gray-500">No users available</p>
+                        </div>
+                        <div v-else>
+                            <label 
+                                v-for="user in userList" 
+                                :key="user.id"
+                                class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                                <input 
+                                    type="checkbox" 
+                                    :value="user.id" 
+                                    v-model="notifyUserIds"
+                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span class="text-sm text-gray-700">{{ user.username }}</span>
+                                <span v-if="user.first_name" class="text-xs text-gray-400">({{ user.first_name }})</span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Selected members will receive a notification when the task finishes, fails, or is revoked.</p>
+                </div>
+            </div>
+            <div v-else class="text-center py-3">
+                <p class="text-sm text-gray-500">Enable notifications to alert members when the task completes.</p>
+            </div>
+        </div>
         
         <!-- Actions -->
         <div class="flex items-center justify-end gap-3 pt-6 pb-2">
@@ -212,6 +259,13 @@ const taskName = ref('')
 const cronExpression = ref('*/5 * * * *')
 const planTime = ref('')
 const webhookSecret = ref('')
+
+// Notification settings
+const notifyEnabled = ref(false)
+const notifyUserIds = ref<number[]>([])
+const userList = ref<any[]>([])
+const loadingUsers = ref(false)
+const currentUserId = ref<number | null>(null)
 // For scheduled task, we might need original status checks, but editing usually restricted to pending.
 
 // Params
@@ -261,7 +315,7 @@ const isValid = computed(() => {
 
 // Setup
 onMounted(async () => {
-    await fetchWorkflows()
+    await Promise.all([fetchWorkflows(), fetchCurrentUser(), fetchUsers()])
     
     if (isEditMode.value && editTaskId.value) {
         await loadTaskForEdit()
@@ -374,6 +428,31 @@ const fetchWorkflows = async () => {
         workflows.value = data
     } catch (e) {
         console.error("Failed to fetch workflows", e)
+    }
+}
+
+const fetchCurrentUser = async () => {
+    try {
+        const { data } = await axios.get('/api/auth/me/')
+        currentUserId.value = data.id
+        // Default: select current user for notification
+        if (!isEditMode.value) {
+            notifyUserIds.value = [data.id]
+        }
+    } catch (e) {
+        console.error('Failed to fetch current user', e)
+    }
+}
+
+const fetchUsers = async () => {
+    loadingUsers.value = true
+    try {
+        const { data } = await axios.get('/api/auth/users/')
+        userList.value = Array.isArray(data) ? data : (data.results || [])
+    } catch (e) {
+        console.error('Failed to fetch users', e)
+    } finally {
+        loadingUsers.value = false
     }
 }
 
@@ -490,7 +569,9 @@ const handleCreateAction = async () => {
         const payload: any = {
             name: taskName.value,
             workflow: selectedWorkflowId.value,
-            context: context
+            context: context,
+            notify_enabled: notifyEnabled.value,
+            notify_user_ids: notifyEnabled.value ? notifyUserIds.value : []
         }
         
         let url = '/api/tasks/'
