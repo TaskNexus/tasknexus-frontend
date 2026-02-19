@@ -465,11 +465,15 @@ const onWorkflowChange = () => {
     }
 }
 
-const applyReplayContext = () => {
-    const replayRaw = route.query.replay as string
-    if (!replayRaw) return
+const applyReplayContext = async () => {
+    const replayTaskId = route.query.replay_task_id as string
+    if (!replayTaskId) return
+    
     try {
-        const context = JSON.parse(decodeURIComponent(replayRaw))
+        const { data } = await axios.get(`/api/tasks/${replayTaskId}/`)
+        
+        // Restore context params
+        const context = data.context || {}
         if (context && typeof context === 'object') {
             allParams.value.forEach(p => {
                 if (p.key in context) {
@@ -477,8 +481,21 @@ const applyReplayContext = () => {
                 }
             })
         }
+        
+        // Restore task name
+        if (data.name) {
+            taskName.value = data.name
+        }
+        
+        // Restore notification settings
+        if (data.notify_enabled !== undefined) {
+            notifyEnabled.value = data.notify_enabled
+        }
+        if (Array.isArray(data.notify_user_ids)) {
+            notifyUserIds.value = data.notify_user_ids
+        }
     } catch (e) {
-        console.error('Failed to parse replay context', e)
+        console.error('Failed to load replay task data', e)
     }
 }
 

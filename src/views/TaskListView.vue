@@ -217,18 +217,11 @@ const goToWorkflow = (workflowId: number) => {
 }
 
 const replayTask = async (task: any) => {
-    try {
-        const { data } = await axios.get(`/api/tasks/${task.id}/`)
-        const context = data.context || {}
-        router.push({
-            name: 'task-create',
-            params: { workflowId: data.workflow },
-            query: { replay: encodeURIComponent(JSON.stringify(context)) }
-        })
-    } catch (e) {
-        console.error('Failed to fetch task for replay', e)
-        alert('获取任务信息失败')
-    }
+    router.push({
+        name: 'task-create',
+        params: { workflowId: task.workflow },
+        query: { replay_task_id: task.id }
+    })
 }
 
 // Deletion Logic
