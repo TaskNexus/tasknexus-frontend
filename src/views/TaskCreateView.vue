@@ -75,7 +75,8 @@
                 </div>
 
                 <!-- Conditional Config: Periodic -->
-                <div v-if="selectedTaskType === 'periodic'" class="p-4 bg-blue-50 rounded border border-blue-100">
+                <div v-if="selectedTaskType === 'periodic'" class="p-4 bg-blue-50 rounded border border-blue-100 space-y-3">
+                    <div>
                         <label class="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wide">Cron Expression</label>
                         <input 
                         v-model="cronExpression" 
@@ -83,7 +84,35 @@
                         class="w-full border-blue-200 rounded focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm font-mono border"
                         placeholder="*/5 * * * *"
                         />
-                        <p class="text-xs text-blue-600 mt-1">Format: Minute Hour Day Month Week</p>
+                    </div>
+                    <div class="bg-white/70 rounded p-3 border border-blue-100 text-xs space-y-2">
+                        <p class="font-semibold text-blue-800">格式：分 时 日 月 周</p>
+                        <div class="grid grid-cols-5 gap-1 text-center text-blue-700 font-mono">
+                            <span class="bg-blue-100 rounded px-1 py-0.5">分(0-59)</span>
+                            <span class="bg-blue-100 rounded px-1 py-0.5">时(0-23)</span>
+                            <span class="bg-blue-100 rounded px-1 py-0.5">日(1-31)</span>
+                            <span class="bg-blue-100 rounded px-1 py-0.5">月(1-12)</span>
+                            <span class="bg-blue-100 rounded px-1 py-0.5">周(0-6)</span>
+                        </div>
+                        <div class="space-y-1 text-gray-600 pt-1 border-t border-blue-100">
+                            <p class="font-medium text-blue-700">常用示例：</p>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                <span><code class="text-blue-600">*/5 * * * *</code> — 每5分钟</span>
+                                <span><code class="text-blue-600">0 * * * *</code> — 每小时整点</span>
+                                <span><code class="text-blue-600">0 9 * * *</code> — 每天9:00</span>
+                                <span><code class="text-blue-600">0 9 * * 1</code> — 每周一9:00</span>
+                                <span><code class="text-blue-600">0 9 1 * *</code> — 每月1日9:00</span>
+                                <span><code class="text-blue-600">30 8 * * 1-5</code> — 工作日8:30</span>
+                            </div>
+                        </div>
+                        <div class="text-gray-500 pt-1 border-t border-blue-100">
+                            <code>*</code> 任意值 &nbsp; <code>*/n</code> 每隔n &nbsp; <code>a-b</code> 范围 &nbsp; <code>a,b</code> 列表
+                        </div>
+                    </div>
+                    <div v-if="cronDescription" class="flex items-center gap-1.5 text-xs px-1">
+                        <span class="text-green-600">⏱</span>
+                        <span class="text-gray-700">{{ cronDescription }}</span>
+                    </div>
                 </div>
 
                 <!-- Conditional Config: Scheduled -->
@@ -169,46 +198,93 @@
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 class="text-lg font-medium text-gray-900 mb-4 flex items-center justify-between">
                 <span>Notification Settings</span>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" v-model="notifyEnabled" class="sr-only peer">
-                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                    <span class="ml-2 text-sm text-gray-600">{{ notifyEnabled ? 'Enabled' : 'Disabled' }}</span>
-                </label>
             </h2>
-
-            <div v-if="notifyEnabled" class="space-y-3">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Notify Members</label>
-                    <div class="border border-gray-300 rounded-md p-2 max-h-48 overflow-y-auto">
-                        <div v-if="loadingUsers" class="text-center py-3">
-                            <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
-                            <p class="text-xs text-gray-500 mt-1">Loading users...</p>
-                        </div>
-                        <div v-else-if="userList.length === 0" class="text-center py-3">
-                            <p class="text-sm text-gray-500">No users available</p>
-                        </div>
-                        <div v-else>
-                            <label 
-                                v-for="user in userList" 
-                                :key="user.id"
-                                class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer transition-colors"
-                            >
-                                <input 
-                                    type="checkbox" 
-                                    :value="user.id" 
-                                    v-model="notifyUserIds"
-                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span class="text-sm text-gray-700">{{ user.username }}</span>
-                                <span v-if="user.first_name" class="text-xs text-gray-400">({{ user.first_name }})</span>
-                            </label>
+            
+            <!-- Platform Notification -->
+            <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-medium text-gray-700">平台通知</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" v-model="notifyEnabled" class="sr-only peer">
+                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <div v-if="notifyEnabled" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-2">通知成员（已注册平台用户）</label>
+                        <div class="border border-gray-200 rounded-md p-2 max-h-36 overflow-y-auto">
+                            <div v-if="loadingUsers" class="text-center py-3">
+                                <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
+                            </div>
+                            <div v-else-if="userList.length === 0" class="text-center py-3">
+                                <p class="text-sm text-gray-500">No users available</p>
+                            </div>
+                            <div v-else>
+                                <label 
+                                    v-for="user in userList" 
+                                    :key="user.id"
+                                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                                >
+                                    <input 
+                                        type="checkbox" 
+                                        :value="user.id" 
+                                        v-model="notifyUserIds"
+                                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span class="text-sm text-gray-700">{{ user.username }}</span>
+                                    <span v-if="user.first_name" class="text-xs text-gray-400">({{ user.first_name }})</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Selected members will receive a notification when the task finishes, fails, or is revoked.</p>
                 </div>
+                <p v-else class="text-xs text-gray-400">通知已注册平台的成员</p>
             </div>
-            <div v-else class="text-center py-3">
-                <p class="text-sm text-gray-500">Enable notifications to alert members when the task completes.</p>
+
+            <!-- Feishu Notification -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-medium text-gray-700">飞书通知</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" v-model="feishuNotifyEnabled" class="sr-only peer">
+                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <div v-if="feishuNotifyEnabled" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-2">飞书用户（无需注册平台）</label>
+                        <div class="border border-gray-200 rounded-md p-2 max-h-36 overflow-y-auto">
+                            <div v-if="loadingFeishuUsers" class="text-center py-3">
+                                <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
+                            </div>
+                            <!-- User list available -->
+                            <div v-else-if="feishuUserList.length > 0">
+                                <label 
+                                    v-for="user in feishuUserList" 
+                                    :key="user.open_id"
+                                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                                >
+                                    <input 
+                                        type="checkbox" 
+                                        :value="user.open_id" 
+                                        v-model="feishuNotifyOpenIds"
+                                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span class="text-sm text-gray-700">{{ user.name }}</span>
+                                </label>
+                            </div>
+                            <!-- API error -->
+                            <div v-else class="text-center py-3">
+                                <div v-if="feishuApiError" class="bg-amber-50 border border-amber-200 rounded p-2">
+                                    <p class="text-xs text-amber-700 font-medium">{{ feishuApiError }}</p>
+                                    <p v-if="feishuApiHint" class="text-xs text-amber-600 mt-0.5">{{ feishuApiHint }}</p>
+                                </div>
+                                <p v-else class="text-sm text-gray-500">无法获取飞书用户列表</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p v-else class="text-xs text-gray-400">直接通知飞书用户，无需平台账号</p>
             </div>
         </div>
         
@@ -241,6 +317,53 @@ import { useRoute, useRouter } from 'vue-router'
 import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
 
+// Cron expression to Chinese description
+const WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'] as const
+function describeCron(expr: string): string {
+    try {
+        const p = expr.trim().split(/\s+/)
+        if (p.length !== 5) return ''
+        const [mi, hr, dom, mon, dow] = p
+        const pad = (s: string) => s.length === 1 ? '0' + s : s
+        let when = ''
+        let time = ''
+
+        // Time part
+        if (mi.match(/^\*\/\d+$/) && hr === '*') {
+            return `每 ${mi.slice(2)} 分钟执行一次`
+        }
+        if (hr.match(/^\*\/\d+$/) && mi === '0') {
+            return `每 ${hr.slice(2)} 小时执行一次`
+        }
+        if (hr !== '*' && mi !== '*') {
+            time = `${pad(hr)}:${pad(mi)}`
+        } else if (hr !== '*') {
+            time = `${pad(hr)} 时`
+        } else if (mi !== '*') {
+            time = `每小时第 ${mi} 分`
+        }
+
+        // Date part
+        if (dow !== '*' && dow !== '0-6') {
+            const days = dow.split(',').map(d => {
+                if (d.includes('-')) {
+                    const [a, b] = d.split('-')
+                    return `周${WEEK_NAMES[+a]}至周${WEEK_NAMES[+b]}`
+                }
+                return `周${WEEK_NAMES[+d]}`
+            }).join('、')
+            when = days
+        } else if (mon !== '*' && dom !== '*') {
+            when = `${mon} 月 ${dom} 日`
+        } else if (dom !== '*') {
+            when = `每月 ${dom} 日`
+        } else {
+            when = '每天'
+        }
+        return time ? `${when} ${time} 执行` : `${when}执行`
+    } catch { return '' }
+}
+
 const route = useRoute()
 const router = useRouter()
 
@@ -257,6 +380,7 @@ const workflowName = ref('')
 const projectId = ref<number | null>(null)
 const taskName = ref('')
 const cronExpression = ref('*/5 * * * *')
+const cronDescription = computed(() => describeCron(cronExpression.value))
 const planTime = ref('')
 const webhookSecret = ref('')
 
@@ -266,6 +390,22 @@ const notifyUserIds = ref<number[]>([])
 const userList = ref<any[]>([])
 const loadingUsers = ref(false)
 const currentUserId = ref<number | null>(null)
+
+// Feishu direct notification
+const feishuNotifyEnabled = ref(false)
+const feishuNotifyOpenIds = ref<string[]>([])
+const feishuUserList = ref<any[]>([])
+const loadingFeishuUsers = ref(false)
+const feishuApiError = ref('')
+const feishuApiHint = ref('')
+const feishuFetched = ref(false)
+
+watch(feishuNotifyEnabled, (val) => {
+    if (val && !feishuFetched.value) {
+        feishuFetched.value = true
+        fetchFeishuUsers()
+    }
+})
 // For scheduled task, we might need original status checks, but editing usually restricted to pending.
 
 // Params
@@ -397,6 +537,20 @@ const loadTaskForEdit = async () => {
              }
         })
         
+        // Restore notification settings
+        if (data.notify_enabled !== undefined) {
+            notifyEnabled.value = data.notify_enabled
+        }
+        if (Array.isArray(data.notify_user_ids)) {
+            notifyUserIds.value = data.notify_user_ids
+        }
+        if (data.feishu_notify_enabled !== undefined) {
+            feishuNotifyEnabled.value = data.feishu_notify_enabled
+        }
+        if (Array.isArray(data.feishu_notify_open_ids)) {
+            feishuNotifyOpenIds.value = data.feishu_notify_open_ids
+        }
+        
     } catch (e) {
         console.error("Failed to load task", e)
         alert('Failed to load task details')
@@ -456,6 +610,26 @@ const fetchUsers = async () => {
     }
 }
 
+const fetchFeishuUsers = async () => {
+    loadingFeishuUsers.value = true
+    feishuApiError.value = ''
+    feishuApiHint.value = ''
+    try {
+        const { data } = await axios.get('/api/feishu/users/')
+        feishuUserList.value = data.users || []
+        if (data.error) {
+            feishuApiError.value = data.error
+            feishuApiHint.value = data.hint || ''
+        }
+    } catch (e) {
+        console.error('Failed to fetch Feishu users', e)
+        feishuUserList.value = []
+        feishuApiError.value = '请求失败'
+    } finally {
+        loadingFeishuUsers.value = false
+    }
+}
+
 const onWorkflowChange = () => {
     if (selectedWorkflowId.value) {
         fetchWorkflowDetails(Number(selectedWorkflowId.value))
@@ -493,6 +667,14 @@ const applyReplayContext = async () => {
         }
         if (Array.isArray(data.notify_user_ids)) {
             notifyUserIds.value = data.notify_user_ids
+        }
+        
+        // Restore Feishu notification settings
+        if (data.feishu_notify_enabled !== undefined) {
+            feishuNotifyEnabled.value = data.feishu_notify_enabled
+        }
+        if (Array.isArray(data.feishu_notify_open_ids)) {
+            feishuNotifyOpenIds.value = data.feishu_notify_open_ids
         }
     } catch (e) {
         console.error('Failed to load replay task data', e)
@@ -588,7 +770,9 @@ const handleCreateAction = async () => {
             workflow: selectedWorkflowId.value,
             context: context,
             notify_enabled: notifyEnabled.value,
-            notify_user_ids: notifyEnabled.value ? notifyUserIds.value : []
+            notify_user_ids: notifyEnabled.value ? notifyUserIds.value : [],
+            feishu_notify_enabled: feishuNotifyEnabled.value,
+            feishu_notify_open_ids: feishuNotifyEnabled.value ? feishuNotifyOpenIds.value : []
         }
         
         let url = '/api/tasks/'

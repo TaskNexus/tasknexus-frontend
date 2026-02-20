@@ -364,7 +364,7 @@
                       v-model="templateDraft" 
                       class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 font-mono leading-relaxed"
                       rows="8"
-                      placeholder="例如：&#10;{{status_emoji}} 分支创建完成&#10;&#10;仓库: {{params.repository}}&#10;分支: {{params.branch_name}}"
+                      placeholder="例如：&#10;{{status_emoji}} 任务 {{task_name}} {{status_label}}&#10;&#10;仓库: {{params.repository}}&#10;内容: {{vars.news}}"
                     ></textarea>
                 </div>
                 <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
@@ -390,11 +390,24 @@
                             <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">{{workflow_name}}</code>
                             <span class="text-gray-500">工作流名称</span>
                         </div>
-                        <div class="flex items-center gap-2 col-span-2 pt-1 border-t border-gray-200 mt-1">
+                        <div class="flex items-center gap-2 col-span-2 pt-2 border-t border-gray-200 mt-1">
                             <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-green-600">{{params.参数名}}</code>
-                            <span class="text-gray-500">运行时参数（来自任务上下文）</span>
+                            <span class="text-gray-500">运行时输入参数（来自任务上下文）</span>
+                        </div>
+                        <div class="flex items-center gap-2 col-span-2 pt-2 border-t border-gray-200 mt-1">
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-purple-600">{{vars.变量名}}</code>
+                            <span class="text-gray-500">流程变量（通过 splice 传递的节点输出）</span>
                         </div>
                     </div>
+                </div>
+                <div class="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
+                    <h4 class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">使用说明</h4>
+                    <ul class="text-xs text-gray-600 space-y-1.5 list-disc list-inside" v-pre>
+                        <li><b>输入参数</b>：任务创建时填写的参数，使用 <code class="text-green-600">{{params.参数名}}</code></li>
+                        <li><b>流程变量</b>：节点输出通过 splice 映射的变量，使用 <code class="text-purple-600">{{vars.变量名}}</code></li>
+                        <li>例如组件输出 content 映射到 ${news}，则模板中使用 <code class="text-purple-600">{{vars.news}}</code></li>
+                        <li>留空则使用默认模板，仅显示任务状态信息</li>
+                    </ul>
                 </div>
             </div>
             <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
