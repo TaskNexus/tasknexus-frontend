@@ -35,7 +35,7 @@
                 class="flex items-center p-2 border border-gray-100 rounded bg-white hover:bg-blue-50 hover:border-blue-200 cursor-move transition-all select-none shadow-sm"
                 @mousedown="handleMouseDown($event, item)"
             >
-                <component :is="item.icon || Box" class="w-4 h-4 mr-2 text-gray-500" />
+                <component :is="item.icon || LucideIcons.Box" class="w-4 h-4 mr-2 text-gray-500" />
                 <div class="flex-1 min-w-0">
                      <div class="text-xs font-medium text-gray-700 truncate" :title="item.label">{{ item.label }}</div>
                 </div>
@@ -47,22 +47,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { 
-  GitBranch, 
-  Layers, 
-  Combine, 
-  Split, 
-  GitMerge, 
-  Box,
-  Terminal,
-  Globe,
-  Database,
-  Cpu,
-  Image,
-  Sparkles,
-  MessageSquare,
-  Bell
-} from 'lucide-vue-next'
+import * as LucideIcons from 'lucide-vue-next'
 import axios from 'axios'
 
 const props = defineProps<{
@@ -78,8 +63,8 @@ const selectedCategory = ref('Standard')
 const categories = computed(() => {
     // Standard always exists
     const cats = [
-        { name: 'Standard', icon: Layers },
-        { name: 'Gateways', icon: GitBranch },
+        { name: 'Standard', icon: LucideIcons['Layers'] },
+        { name: 'Gateways', icon: LucideIcons['GitBranch'] },
     ]
     
     // Add remote categories unique
@@ -91,8 +76,8 @@ const categories = computed(() => {
             return
         }
         if (cat !== 'Standard') {
-             let catIcon = Cpu
-             if (cat === 'AI') catIcon = Sparkles
+             let catIcon = LucideIcons['Cpu']
+             if (cat === 'AI') catIcon = LucideIcons['Sparkles']
              cats.push({ name: cat, icon: catIcon })
         }
     })
@@ -101,14 +86,14 @@ const categories = computed(() => {
 })
 
 const standardItems = [
-    { type: 'subprocess', label: 'Sub Process', icon: Layers },
+    { type: 'subprocess', label: 'Sub Process', icon: LucideIcons['Layers'] },
 ]
 
 const gatewayItems = [
-    { type: 'branch', label: 'Branch Gateway', icon: GitBranch },
-    { type: 'parallel', label: 'Parallel Gateway', icon: Split },
-    { type: 'converge', label: 'Converge Gateway', icon: Combine },
-    { type: 'conditional', label: 'Conditional Parallel', icon: GitMerge },
+    { type: 'branch', label: 'Branch Gateway', icon: LucideIcons['GitBranch'] },
+    { type: 'parallel', label: 'Parallel Gateway', icon: LucideIcons['Split'] },
+    { type: 'converge', label: 'Converge Gateway', icon: LucideIcons['Combine'] },
+    { type: 'conditional', label: 'Conditional Parallel', icon: LucideIcons['GitMerge'] },
 ]
 
 const currentItems = computed(() => {
@@ -124,15 +109,18 @@ const currentItems = computed(() => {
     const remotes = remoteComponents.value
         .filter(c => c.category === selectedCategory.value)
         .map(c => {
-            let icon = Box
-            if (c.code === 'shell') icon = Terminal
-            if (c.code === 'text2image') icon = Image
-            if (c.code === 'chat2ai') icon = MessageSquare
-            if (c.code === 'notify_message') icon = Bell
+            let iconName = c.icon
+            let iconComponent = LucideIcons['Box']
+
+            if (iconName && (LucideIcons as any)[iconName]) {
+                iconComponent = (LucideIcons as any)[iconName]
+            }
+
             return {
                 type: 'custom', // X6 type
                 label: c.name,
-                icon: icon,
+                icon: iconComponent,
+                iconName: iconName,
                 componentCode: c.code,
                 version: c.version,
                 inputs: c.inputs,

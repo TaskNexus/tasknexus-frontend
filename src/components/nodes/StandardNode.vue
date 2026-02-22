@@ -94,7 +94,9 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, onMounted, onUnmounted } from 'vue'
-import { Code, Server, Database, Globe, Loader2, Clock, CheckCircle2 } from 'lucide-vue-next'
+import * as LucideIcons from 'lucide-vue-next'
+// We still need specific icons for UI elements (loaders, checks) but node icons are dynamic.
+import { Loader2, CheckCircle2 } from 'lucide-vue-next'
 import axios from 'axios'
 
 const props = defineProps<{
@@ -276,12 +278,17 @@ const statusText = computed(() => {
 
 // Icon mapping
 const iconComponent = computed(() => {
-    switch (data.value.icon) {
-        case 'server': return Server
-        case 'database': return Database
-        case 'globe': return Globe
-        default: return Code
+    const iconName = data.value.icon
+    const t = (data.value.type || '').toUpperCase()
+
+    if (t === 'START') return LucideIcons['Play']
+    if (t === 'END') return LucideIcons['CircleStop']
+    
+    if (typeof iconName === 'string' && iconName && (LucideIcons as any)[iconName]) {
+        return (LucideIcons as any)[iconName]
     }
+    
+    return LucideIcons['Box']
 })
 
 // Container styles (Background & Border)
