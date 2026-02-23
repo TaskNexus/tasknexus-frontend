@@ -132,6 +132,7 @@ import {
   Users,
   MessageSquare,
   Server,
+  Settings,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -154,7 +155,8 @@ const isActive = (item: any) => {
   return route.path.startsWith(item.to)
 }
 
-const navItems = computed(() => [
+const navItems = computed(() => {
+  const items: any[] = [
   { name: t('nav.home'), to: '/', routeName: 'home', icon: LayoutDashboard },
   { name: t('nav.aiChat'), to: '/chat', routeName: 'ai-chat', icon: MessageSquare },
   { name: t('nav.projects'), to: '/projects', routeName: 'projects', icon: FolderKanban },
@@ -172,7 +174,13 @@ const navItems = computed(() => [
   },
   { name: t('nav.members'), to: '/members', routeName: 'platform-members', icon: Users },
   { name: t('nav.clientAgents'), to: '/client-agents', routeName: 'client-agents', icon: Server },
-])
+  ]
+  // Admin-only: Platform Settings
+  if (authStore.user?.is_superuser || authStore.user?.is_staff) {
+      items.push({ name: '平台设置', to: '/platform/settings', routeName: 'platform-settings', icon: Settings })
+  }
+  return items
+})
 
 const currentRouteName = computed(() => {
     // Find matching child

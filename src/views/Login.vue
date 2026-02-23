@@ -20,6 +20,7 @@
           账号密码登录
         </button>
         <button 
+          v-if="feishuLoginEnabled"
           @click="loginMode = 'qrcode'" 
           :class="['flex-1 py-2 px-4 text-center font-medium text-sm transition-colors', loginMode === 'qrcode' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
         >
@@ -64,7 +65,8 @@
           </button>
         </div>
 
-        <!-- Divider -->
+        <!-- Divider & Feishu Login Button (only when enabled) -->
+        <template v-if="feishuLoginEnabled">
         <div class="relative">
           <div class="absolute inset-0 flex items-center">
             <div class="w-full border-t border-gray-300"></div>
@@ -86,10 +88,11 @@
             使用飞书登录
           </button>
         </div>
+        </template>
       </form>
 
-      <!-- QR Code Login -->
-      <div v-else class="mt-8 space-y-6">
+      <!-- QR Code Login (only when Feishu is enabled) -->
+      <div v-else-if="feishuLoginEnabled" class="mt-8 space-y-6">
         <div class="text-center text-sm text-gray-500 mb-4">
           请使用飞书 App 扫描二维码登录
         </div>
@@ -122,6 +125,7 @@ const password = ref('')
 const authStore = useAuthStore()
 const loginMode = ref<'password' | 'qrcode'>('password')
 const qrLoading = ref(true)
+const feishuLoginEnabled = ref(false)
 const gotoUrl = ref('')
 
 declare global {
@@ -225,11 +229,19 @@ watch(loginMode, (newMode) => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('message', handleQRMessage)
   
+  // Check if Feishu login is enabled
+  try {
+    const { data } = await axios.get('/api/platform/feishu-login-status/')
+    feishuLoginEnabled.value = data.login_enabled
+  } catch (e) {
+    feishuLoginEnabled.value = false
+  }
+  
   // If starting with QR mode, initialize it
-  if (loginMode.value === 'qrcode') {
+  if (loginMode.value === 'qrcode' && feishuLoginEnabled.value) {
     initQRLogin()
   }
 })

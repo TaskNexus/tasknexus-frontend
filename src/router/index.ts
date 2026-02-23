@@ -106,6 +106,11 @@ const router = createRouter({
           name: 'client-agent-detail',
           component: () => import('../views/ClientAgentDetailView.vue'),
         },
+        {
+          path: 'platform/settings',
+          name: 'platform-settings',
+          component: () => import('../views/PlatformSettingsView.vue')
+        },
       ]
     },
     {
