@@ -288,7 +288,7 @@ const iconComponent = computed(() => {
         return (LucideIcons as any)[iconName]
     }
     
-    return LucideIcons['Box']
+    return LucideIcons['Component']
 })
 
 // Container styles (Background & Border)

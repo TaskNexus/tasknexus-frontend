@@ -36,7 +36,7 @@
                 class="flex items-center p-2 border border-gray-100 rounded bg-white hover:bg-blue-50 hover:border-blue-200 cursor-move transition-all select-none shadow-sm"
                 @mousedown="handleMouseDown($event, item)"
             >
-                <component :is="item.icon || LucideIcons.Box" class="w-4 h-4 mr-2 text-gray-500" />
+                <component :is="item.icon || LucideIcons.Component" class="w-4 h-4 mr-2 text-gray-500" />
                 <div class="flex-1 min-w-0">
                      <div class="text-xs font-medium text-gray-700 truncate" :title="item.label">{{ item.label }}</div>
                 </div>
@@ -150,7 +150,7 @@ const resolveCatIcon = (iconName: string) => {
     if (iconName && (LucideIcons as any)[iconName]) {
         return (LucideIcons as any)[iconName]
     }
-    return LucideIcons['Box']
+    return LucideIcons['Component']
 }
 
 const openIconPicker = (cat: { name: string, icon: string }, e: MouseEvent) => {
@@ -178,8 +178,8 @@ const selectIcon = async (iconName: string) => {
 const categories = computed(() => {
     // Standard always exists
     const cats: { name: string, icon: string }[] = [
-        { name: 'Standard', icon: categoryIconMap.value['Standard'] || 'Box' },
-        { name: 'Gateways', icon: categoryIconMap.value['Gateways'] || 'Box' },
+        { name: 'Standard', icon: categoryIconMap.value['Standard'] || 'Component' },
+        { name: 'Gateways', icon: categoryIconMap.value['Gateways'] || 'Component' },
     ]
     
     // Add remote categories unique
@@ -188,7 +188,7 @@ const categories = computed(() => {
     remoteCats.forEach(cat => {
         if (cat == "Uncategorized") return
         if (cat !== 'Standard') {
-            cats.push({ name: cat, icon: categoryIconMap.value[cat] || 'Box' })
+            cats.push({ name: cat, icon: categoryIconMap.value[cat] || 'Component' })
         }
     })
     
@@ -220,7 +220,7 @@ const currentItems = computed(() => {
         .filter(c => c.category === selectedCategory.value)
         .map(c => {
             let iconName = c.icon
-            let iconComponent = LucideIcons['Box']
+            let iconComponent = LucideIcons['Component']
 
             if (iconName && (LucideIcons as any)[iconName]) {
                 iconComponent = (LucideIcons as any)[iconName]

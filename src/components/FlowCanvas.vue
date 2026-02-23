@@ -269,7 +269,7 @@ const handleStartDrag = (node: any, e: MouseEvent) => {
         data: {
             label: node.label,
             type: nodeType,
-            icon: node.iconName || 'Box',
+            icon: node.iconName || 'Component',
             status: 'default',
             componentCode: node.componentCode,
             version: node.version,
