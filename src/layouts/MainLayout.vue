@@ -175,8 +175,9 @@ const navItems = computed(() => {
   { name: t('nav.members'), to: '/members', routeName: 'platform-members', icon: Users },
   { name: t('nav.clientAgents'), to: '/client-agents', routeName: 'client-agents', icon: Server },
   ]
-  // Admin-only: Platform Settings
-  if (authStore.user?.is_superuser || authStore.user?.is_staff) {
+  // Maintainer+ only: Platform Settings (includes permissions matrix)
+  const role = authStore.user?.platform_role || authStore.user?.role
+  if (role === 'OWNER' || role === 'MAINTAINER') {
       items.push({ name: '平台设置', to: '/platform/settings', routeName: 'platform-settings', icon: Settings })
   }
   return items

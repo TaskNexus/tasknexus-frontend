@@ -91,9 +91,9 @@
                             v-model="newMemberRole"
                             class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2 h-[38px]"
                         >
-                            <option value="VIEWER">Viewer</option>
+                            <option value="REPORTER">Reporter</option>
                             <option value="DEVELOPER">Developer</option>
-                            <option value="ADMIN">Admin</option>
+                            <option value="MAINTAINER">Maintainer</option>
                         </select>
                         <button 
                             @click="addMember" 
@@ -135,9 +135,9 @@
                                             :disabled="member.role === 'OWNER'"
                                         >
                                             <option value="OWNER">Owner</option>
-                                            <option value="ADMIN">Admin</option>
+                                            <option value="MAINTAINER">Maintainer</option>
                                             <option value="DEVELOPER">Developer</option>
-                                            <option value="VIEWER">Viewer</option>
+                                            <option value="REPORTER">Reporter</option>
                                         </select>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -465,7 +465,7 @@ const showUserDropdown = ref(false)
 const selectedUser = ref<any>(null)
 let searchTimeout: any = null
 
-const newMemberRole = ref('VIEWER')
+const newMemberRole = ref('REPORTER')
 const addingMember = ref(false)
 
 const addModelGroup = () => {

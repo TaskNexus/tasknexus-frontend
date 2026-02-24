@@ -49,8 +49,9 @@
                 class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
                 :class="{
                   'bg-purple-100 text-purple-800': user.role === 'OWNER',
-                  'bg-blue-100 text-blue-800': user.role === 'ADMIN',
-                  'bg-gray-100 text-gray-800': user.role === 'MEMBER'
+                  'bg-blue-100 text-blue-800': user.role === 'MAINTAINER',
+                  'bg-green-100 text-green-800': user.role === 'DEVELOPER',
+                  'bg-gray-100 text-gray-800': user.role === 'REPORTER'
                 }"
               >
                 {{ user.role }}
@@ -88,9 +89,10 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Role</label>
                     <select v-model="editFormRole" class="mt-1 block w-full pl-3 pr-10 py-2 border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
-                        <option value="MEMBER">Member</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="OWNER" disabled>Owner (Cannot assign)</option>
+                        <option value="REPORTER">Reporter</option>
+                        <option value="DEVELOPER">Developer</option>
+                        <option value="MAINTAINER">Maintainer</option>
+                        <option value="OWNER">Owner</option>
                     </select>
                 </div>
             </div>
@@ -115,7 +117,7 @@ const searchQuery = ref('')
 const authStore = useAuthStore()
 
 const editingUser = ref<any>(null)
-const editFormRole = ref('MEMBER')
+const editFormRole = ref('REPORTER')
 
 const fetchUsers = async () => {
     loading.value = true
@@ -134,9 +136,9 @@ const fetchUsers = async () => {
 const canManage = (targetUser: any) => {
     const currentUser = authStore.user
     if (!currentUser) return false
-    if (currentUser.role !== 'ADMIN' && currentUser.role !== 'OWNER') return false
+    if (currentUser.role !== 'MAINTAINER' && currentUser.role !== 'OWNER') return false
     if (targetUser.role === 'OWNER') return false
-    if (currentUser.role === 'ADMIN' && targetUser.role === 'ADMIN') return false
+    if (currentUser.role === 'MAINTAINER' && targetUser.role === 'MAINTAINER') return false
     return true
 }
 
@@ -152,9 +154,8 @@ const openEdit = (user: any) => {
 const saveRole = async () => {
     if (!editingUser.value) return
     try {
-        const isStaff = editFormRole.value === 'ADMIN'
         await axios.patch(`/api/auth/users/${editingUser.value.id}/`, {
-            is_staff: isStaff
+            platform_role: editFormRole.value
         })
         editingUser.value = null
         fetchUsers()

@@ -39,9 +39,10 @@
                         v-model="newMemberRole"
                         class="block w-24 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md border"
                     >
-                        <option value="VIEWER">Viewer</option>
-                        <option value="DEVELOPER">Dev</option>
-                        <option value="ADMIN">Admin</option>
+                        <option value="REPORTER">Reporter</option>
+                        <option value="DEVELOPER">Developer</option>
+                        <option value="MAINTAINER">Maintainer</option>
+                        <option value="OWNER">Owner</option>
                     </select>
                     <button 
                         @click="addMember" 
@@ -77,9 +78,9 @@
                             class="text-xs border-gray-200 rounded p-1 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="OWNER">Owner</option>
-                            <option value="ADMIN">Admin</option>
-                            <option value="DEVELOPER">Dev</option>
-                            <option value="VIEWER">Viewer</option>
+                            <option value="MAINTAINER">Maintainer</option>
+                            <option value="DEVELOPER">Developer</option>
+                            <option value="REPORTER">Reporter</option>
                         </select>
                         <span v-else class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">{{ member.role }}</span>
 
@@ -117,7 +118,7 @@ const members = ref<any[]>([])
 const loading = ref(false)
 const adding = ref(false)
 const newMemberUsername = ref('')
-const newMemberRole = ref('VIEWER')
+const newMemberRole = ref('REPORTER')
 const addError = ref('')
 
 const fetchMembers = async () => {
@@ -215,7 +216,7 @@ watch(() => props.isOpen, (val) => {
     if (val && props.projectId) {
         fetchMembers()
         newMemberUsername.value = ''
-        newMemberRole.value = 'VIEWER'
+        newMemberRole.value = 'REPORTER'
     }
 })
 

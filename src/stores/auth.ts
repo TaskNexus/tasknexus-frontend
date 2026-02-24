@@ -17,10 +17,14 @@ axios.interceptors.request.use(config => {
 axios.interceptors.response.use(
     (response: any) => response,
     (error: any) => {
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            // Token expired or invalid
+        if (error.response?.status === 401) {
+            // Token expired or invalid — redirect to login
             const authStore = useAuthStore()
             authStore.logout()
+        } else if (error.response?.status === 403) {
+            // Permission denied — show message, do NOT logout
+            const detail = error.response.data?.detail || '权限不足，无法执行此操作'
+            alert(detail)
         }
         return Promise.reject(error)
     }
