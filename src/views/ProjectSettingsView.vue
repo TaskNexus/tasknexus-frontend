@@ -385,6 +385,62 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Client Agent Settings -->
+            <section class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-4 pb-2 border-b cursor-pointer select-none" @click="toggleSection('agent')">
+                    <h2 class="text-lg font-medium text-gray-900 flex items-center gap-2">
+                        <component :is="collapsedSections.agent ? ChevronRight : ChevronDown" class="w-5 h-5 text-gray-500" />
+                        Client Agent Settings
+                    </h2>
+                </div>
+                
+                <div v-show="!collapsedSections.agent">
+                    <p class="text-sm text-gray-500 mb-4">Configure git repository for client agent code. The branch here is the default; individual nodes can override it.</p>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Repository URL</label>
+                            <input 
+                                v-model="agentRepoUrl" 
+                                type="text" 
+                                placeholder="https://github.com/user/repo.git"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Repository Token</label>
+                            <input 
+                                v-model="agentRepoToken" 
+                                type="password" 
+                                placeholder="ghp_... or glpat-..."
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+                            />
+                            <p class="mt-1 text-xs text-gray-400">Used for authenticating git clone/pull operations on the client agent.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Default Branch</label>
+                            <input 
+                                v-model="agentRepoRef" 
+                                type="text" 
+                                placeholder="main"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+                            />
+                            <p class="mt-1 text-xs text-gray-400">Default branch/ref. Can be overridden per workflow node.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mt-6">
+                        <button 
+                            @click="saveAgentConfig" 
+                            :disabled="savingAgentConfig"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {{ savingAgentConfig ? 'Saving...' : 'Save Agent Settings' }}
+                        </button>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
   </div>
@@ -414,7 +470,8 @@ const collapsedSections = reactive({
     ai: true,
     network: true, // Default collapsed
     global: true, // Default collapsed
-    tags: true    // Default collapsed
+    tags: true,   // Default collapsed
+    agent: true   // Default collapsed
 })
 
 // Network Config State
@@ -514,13 +571,37 @@ const removeGlobalParam = (index: number) => {
     globalParams.value.splice(index, 1)
 }
 
+// Client Agent Config State
+const agentRepoUrl = ref('')
+const agentRepoToken = ref('')
+const agentRepoRef = ref('main')
+const savingAgentConfig = ref(false)
+
+const saveAgentConfig = async () => {
+    savingAgentConfig.value = true
+    try {
+        await axios.patch(`/api/projects/${projectId}/`, {
+            extra_config: getExtraConfig()
+        })
+        alert('Agent settings saved successfully')
+    } catch (e: any) {
+        console.error("Failed to save agent config", e)
+        alert(e.response?.data?.detail || 'Failed to save agent settings')
+    } finally {
+        savingAgentConfig.value = false
+    }
+}
+
 // Helper to construct extra_config ensuring all parts are included
 const getExtraConfig = () => {
     return {
         model_groups: modelGroups.value,
         global_params: globalParams.value,
         workflow_tags: workflowTags.value,
-        proxy_url: proxyUrl.value
+        proxy_url: proxyUrl.value,
+        agent_repo_url: agentRepoUrl.value,
+        agent_repo_token: agentRepoToken.value,
+        agent_repo_ref: agentRepoRef.value,
     }
 }
 
@@ -557,6 +638,15 @@ const fetchProject = async () => {
             }
             if (data.extra_config.proxy_url) {
                 proxyUrl.value = data.extra_config.proxy_url
+            }
+            if (data.extra_config.agent_repo_url !== undefined) {
+                agentRepoUrl.value = data.extra_config.agent_repo_url
+            }
+            if (data.extra_config.agent_repo_token !== undefined) {
+                agentRepoToken.value = data.extra_config.agent_repo_token
+            }
+            if (data.extra_config.agent_repo_ref) {
+                agentRepoRef.value = data.extra_config.agent_repo_ref
             }
         }
     } catch (e) {

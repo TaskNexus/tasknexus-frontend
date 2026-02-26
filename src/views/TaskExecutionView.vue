@@ -106,6 +106,17 @@
                    </span>
                 </div>
 
+                <!-- View Logs Button (for Client Agent nodes) -->
+                <div v-if="agentTaskId">
+                    <button 
+                        @click="showLogModal = true"
+                        class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-green-400 hover:bg-gray-800 rounded-md text-sm font-medium transition-colors border border-gray-700"
+                    >
+                        <Terminal class="w-4 h-4" />
+                        View Logs
+                    </button>
+                </div>
+
                 <!-- Outputs -->
                 <div>
                     <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Outputs</label>
@@ -143,6 +154,13 @@
             <Loader2 class="w-8 h-8 text-blue-600 animate-spin" />
         </div>
     </div>
+
+    <!-- Agent Log Modal -->
+    <AgentLogModal 
+      :visible="showLogModal" 
+      :taskId="agentTaskId" 
+      @close="showLogModal = false" 
+    />
   </div>
 </template>
 
@@ -150,8 +168,9 @@
 import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { Play, Pause, Ban, Loader2, X } from 'lucide-vue-next'
+import { Play, Pause, Ban, Loader2, X, Terminal } from 'lucide-vue-next'
 import FlowCanvas from '../components/FlowCanvas.vue'
+import AgentLogModal from '../components/AgentLogModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -166,6 +185,13 @@ let pollTimer: any = null
 const activeNode = ref<any>(null)
 const nodeData = ref<any>(null)
 const nodeLoading = ref(false)
+const showLogModal = ref(false)
+
+// Computed: extract agent task_id from node outputs if this is a client_agent node
+const agentTaskId = computed(() => {
+    if (!nodeData.value?.outputs) return null
+    return nodeData.value.outputs.task_id || null
+})
 
 // Navigation Stack for SubProcesses
 interface NavItem {
