@@ -1,169 +1,155 @@
 <template>
-  <div class="h-full flex flex-col bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-        <button @click="$router.back()" class="text-gray-500 hover:text-gray-700">
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
+  <div class="h-full flex bg-white">
+    <!-- Sidebar Navigation -->
+    <aside class="w-60 min-w-60 bg-white border-r border-gray-200 flex flex-col">
+      <div class="px-5 pt-5 pb-4">
+        <button @click="$router.back()" class="inline-flex items-center gap-1.5 text-gray-400 hover:text-gray-700 text-xs mb-3 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          返回
         </button>
-        <h1 class="text-xl font-bold text-gray-800">平台设置</h1>
-    </header>
+        <h1 class="text-lg font-bold text-gray-800">平台设置</h1>
+        <p class="text-xs text-gray-400 mt-1">管理平台级别的配置</p>
+      </div>
 
-    <div class="flex-1 overflow-auto p-6">
-        <div class="max-w-5xl mx-auto space-y-8">
-            
-            <!-- Feishu Integration -->
-            <section class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center justify-between mb-4 pb-2 border-b cursor-pointer select-none" @click="toggleSection('feishu')">
-                    <h2 class="text-lg font-medium text-gray-900 flex items-center gap-2">
-                        <component :is="collapsedSections.feishu ? ChevronRight : ChevronDown" class="w-5 h-5 text-gray-500" />
-                        飞书集成
-                    </h2>
-                </div>
-                
-                <div v-show="!collapsedSections.feishu" class="space-y-4">
-                    <p class="text-sm text-gray-500">配置飞书应用凭证，用于 OAuth 登录、通知推送和用户列表获取。</p>
-                    
-                    <!-- Login Enabled Toggle -->
-                    <div class="flex items-center justify-between py-2">
-                        <div>
-                            <label class="text-sm font-medium text-gray-700">启用飞书登录</label>
-                            <p class="text-xs text-gray-400">开启后登录页会显示飞书登录入口</p>
-                        </div>
-                        <button 
-                            @click="feishuForm.login_enabled = !feishuForm.login_enabled"
-                            :class="[
-                                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                                feishuForm.login_enabled ? 'bg-blue-600' : 'bg-gray-300'
-                            ]"
-                        >
-                            <span 
-                                :class="[
-                                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                                    feishuForm.login_enabled ? 'translate-x-6' : 'translate-x-1'
-                                ]"
-                            />
-                        </button>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">App ID</label>
-                        <input 
-                            v-model="feishuForm.app_id" 
-                            type="text" 
-                            placeholder="cli_xxxxxxxxx"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">App Secret</label>
-                        <input 
-                            v-model="feishuForm.app_secret" 
-                            type="password" 
-                            placeholder="输入新的 App Secret（留空保持不变）"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
-                        />
-                        <p v-if="maskedSecret" class="mt-1 text-xs text-gray-400">当前值: {{ maskedSecret }}</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Redirect URI</label>
-                        <input 
-                            v-model="feishuForm.redirect_uri" 
-                            type="text" 
-                            placeholder="http://your-domain/feishu-callback"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
-                        />
-                        <p class="mt-1 text-xs text-gray-400">飞书 OAuth 回调地址，需与飞书开放平台配置一致</p>
-                    </div>
-                    
-                    <div class="flex justify-end">
-                        <button 
-                            @click="saveFeishuConfig" 
-                            :disabled="savingFeishu"
-                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {{ savingFeishu ? '保存中...' : '保存飞书配置' }}
-                        </button>
-                    </div>
-                </div>
-            </section>
+      <div class="border-t border-gray-100"></div>
 
-            <!-- Permission Matrix -->
-            <section class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center justify-between mb-4 pb-2 border-b cursor-pointer select-none" @click="toggleSection('permissions')">
-                    <h2 class="text-lg font-medium text-gray-900 flex items-center gap-2">
-                        <component :is="collapsedSections.permissions ? ChevronRight : ChevronDown" class="w-5 h-5 text-gray-500" />
-                        角色与权限
-                    </h2>
-                </div>
-
-                <div v-show="!collapsedSections.permissions">
-                    <p class="text-sm text-gray-500 mb-4">管理不同角色对操作的权限。勾选表示该角色拥有该操作权限。</p>
-
-                    <!-- Loading -->
-                    <div v-if="permLoading" class="flex items-center justify-center py-8">
-                        <Loader2 class="w-5 h-5 animate-spin text-blue-500" />
-                        <span class="ml-2 text-sm text-gray-500">加载中...</span>
-                    </div>
-
-                    <!-- Matrix Table -->
-                    <div v-else class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">操作</th>
-                                    <th v-for="role in roles" :key="role" class="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider w-24" :class="roleHeaderClass(role)">
-                                        {{ role }}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <template v-for="group in permissionGroups" :key="group.name">
-                                    <tr class="bg-gray-50">
-                                        <td :colspan="roles.length + 1" class="px-4 py-1.5 text-sm font-semibold text-gray-700">
-                                            {{ group.name }}
-                                        </td>
-                                    </tr>
-                                    <tr v-for="perm in group.permissions" :key="perm.key" class="hover:bg-blue-50 transition-colors">
-                                        <td class="px-4 py-2 text-sm text-gray-700 pl-8">
-                                            {{ perm.label }}
-                                            <span v-if="perm.description" class="text-xs text-gray-400 ml-1">({{ perm.description }})</span>
-                                        </td>
-                                        <td v-for="role in roles" :key="role" class="px-4 py-2 text-center">
-                                            <input type="checkbox" :checked="isPermitted(perm.key, role)" @change="togglePermission(perm.key, role)" :disabled="role === 'OWNER'" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" />
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Footer -->
-                    <div class="mt-4 flex items-center justify-between">
-                        <p class="text-xs text-gray-400">
-                            <Info class="w-3 h-3 inline-block mr-1" />
-                            Owner 角色默认拥有所有权限且不可修改
-                        </p>
-                        <div class="flex gap-3">
-                            <button @click="resetToDefault" class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                                恢复默认
-                            </button>
-                            <button @click="savePermissions" :disabled="permSaving || !permHasChanges" class="px-3 py-1.5 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <Loader2 v-if="permSaving" class="w-3 h-3 animate-spin inline-block mr-1" />
-                                {{ permSaving ? '保存中...' : '保存权限' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
+      <nav class="flex-1 overflow-y-auto py-3 px-3">
+        <div>
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mb-1.5">配置</div>
+          <button
+            v-for="item in navItems" :key="item.key"
+            @click="activeSection = item.key"
+            class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all mb-0.5"
+            :class="activeSection === item.key
+              ? 'bg-blue-50 text-blue-600 font-medium border-l-[3px] border-blue-600'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800 border-l-[3px] border-transparent'"
+          >
+            <component :is="item.icon" class="w-4 h-4 flex-shrink-0" />
+            {{ item.label }}
+          </button>
         </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- Top Bar -->
+      <div class="px-8 py-4 bg-white border-b border-gray-200 flex items-baseline gap-3">
+        <h2 class="text-lg font-semibold text-gray-800">{{ currentSectionMeta.title }}</h2>
+        <span class="text-sm text-gray-400">{{ currentSectionMeta.subtitle }}</span>
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 overflow-y-auto px-8 py-6">
+
+          <!-- ==================== Feishu Integration ==================== -->
+          <section v-if="activeSection === 'feishu'">
+            <p class="text-sm text-gray-500 mb-4">配置飞书应用凭证，用于 OAuth 登录、通知推送和用户列表获取。</p>
+
+            <!-- Login Enabled Toggle -->
+            <div class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg mb-4">
+              <div>
+                <label class="text-sm font-medium text-gray-700">启用飞书登录</label>
+                <p class="text-xs text-gray-400 mt-0.5">开启后登录页会显示飞书登录入口</p>
+              </div>
+              <button
+                @click="feishuForm.login_enabled = !feishuForm.login_enabled"
+                :class="['relative inline-flex h-6 w-11 items-center rounded-full transition-colors', feishuForm.login_enabled ? 'bg-blue-600' : 'bg-gray-300']"
+              >
+                <span :class="['inline-block h-4 w-4 transform rounded-full bg-white transition-transform', feishuForm.login_enabled ? 'translate-x-6' : 'translate-x-1']" />
+              </button>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">App ID</label>
+                <input v-model="feishuForm.app_id" type="text" placeholder="cli_xxxxxxxxx" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">App Secret</label>
+                <input v-model="feishuForm.app_secret" type="password" placeholder="输入新的 App Secret（留空保持不变）" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+                <p v-if="maskedSecret" class="mt-1 text-xs text-gray-400">当前值: {{ maskedSecret }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Redirect URI</label>
+                <input v-model="feishuForm.redirect_uri" type="text" placeholder="http://your-domain/feishu-callback" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+                <p class="mt-1 text-xs text-gray-400">飞书 OAuth 回调地址，需与飞书开放平台配置一致</p>
+              </div>
+            </div>
+
+            <div class="flex justify-end pt-4 mt-4 border-t border-gray-100">
+              <button @click="saveFeishuConfig" :disabled="savingFeishu" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {{ savingFeishu ? '保存中...' : '保存飞书配置' }}
+              </button>
+            </div>
+          </section>
+
+          <!-- ==================== Permission Matrix ==================== -->
+          <section v-if="activeSection === 'permissions'">
+            <p class="text-sm text-gray-500 mb-4">管理不同角色对操作的权限。勾选表示该角色拥有该操作权限。</p>
+
+            <!-- Loading -->
+            <div v-if="permLoading" class="flex items-center justify-center py-8">
+              <Loader2 class="w-5 h-5 animate-spin text-blue-500" />
+              <span class="ml-2 text-sm text-gray-500">加载中...</span>
+            </div>
+
+            <!-- Matrix Table -->
+            <div v-else class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">操作</th>
+                    <th v-for="role in roles" :key="role" class="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider w-24" :class="roleHeaderClass(role)">
+                      {{ role }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <template v-for="group in permissionGroups" :key="group.name">
+                    <tr class="bg-gray-50">
+                      <td :colspan="roles.length + 1" class="px-4 py-1.5 text-sm font-semibold text-gray-700">
+                        {{ group.name }}
+                      </td>
+                    </tr>
+                    <tr v-for="perm in group.permissions" :key="perm.key" class="hover:bg-blue-50 transition-colors">
+                      <td class="px-4 py-2 text-sm text-gray-700 pl-8">
+                        {{ perm.label }}
+                        <span v-if="perm.description" class="text-xs text-gray-400 ml-1">({{ perm.description }})</span>
+                      </td>
+                      <td v-for="role in roles" :key="role" class="px-4 py-2 text-center">
+                        <input type="checkbox" :checked="isPermitted(perm.key, role)" @change="togglePermission(perm.key, role)" :disabled="role === 'OWNER'" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" />
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+              <p class="text-xs text-gray-400">
+                <Info class="w-3 h-3 inline-block mr-1" />
+                Owner 角色默认拥有所有权限且不可修改
+              </p>
+              <div class="flex gap-3">
+                <button @click="resetToDefault" class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                  恢复默认
+                </button>
+                <button @click="savePermissions" :disabled="permSaving || !permHasChanges" class="px-3 py-1.5 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <Loader2 v-if="permSaving" class="w-3 h-3 animate-spin inline-block mr-1" />
+                  {{ permSaving ? '保存中...' : '保存权限' }}
+                </button>
+              </div>
+            </div>
+          </section>
+
+      </div>
     </div>
 
     <!-- Toast -->
     <div v-if="toast.show" class="fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg text-sm font-medium z-50" :class="toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'">
-        {{ toast.message }}
+      {{ toast.message }}
     </div>
   </div>
 </template>
@@ -171,17 +157,22 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import axios from 'axios'
-import { ChevronDown, ChevronRight, Loader2, Info } from 'lucide-vue-next'
+import { Link, Shield, Loader2, Info } from 'lucide-vue-next'
 
-// ==================== Section collapse ====================
-const collapsedSections = reactive({
-    feishu: false,
-    permissions: false,
-})
+// ==================== Sidebar Navigation ====================
+const activeSection = ref('feishu')
 
-const toggleSection = (section: keyof typeof collapsedSections) => {
-    collapsedSections[section] = !collapsedSections[section]
+const navItems = [
+  { key: 'feishu', label: '飞书集成', icon: Link },
+  { key: 'permissions', label: '角色与权限', icon: Shield },
+]
+
+const sectionMeta: Record<string, { title: string; subtitle: string }> = {
+  feishu:      { title: '飞书集成',   subtitle: '配置飞书 OAuth 登录和通知' },
+  permissions: { title: '角色与权限', subtitle: '管理不同角色的操作权限' },
 }
+
+const currentSectionMeta = computed(() => sectionMeta[activeSection.value] || { title: '', subtitle: '' })
 
 // ==================== Toast ====================
 const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
@@ -247,7 +238,7 @@ const saveFeishuConfig = async () => {
         }
 
         const { data } = await axios.put('/api/platform/config/', payload)
-        
+
         if (data.feishu) {
             maskedSecret.value = data.feishu.app_secret || ''
             feishuForm.value.app_secret = ''
