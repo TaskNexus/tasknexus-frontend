@@ -87,11 +87,6 @@ const router = createRouter({
           component: () => import('../views/WorkflowDesignerView.vue'),
         },
         {
-          path: 'members',
-          name: 'platform-members',
-          component: () => import('../views/PlatformMembersView.vue'),
-        },
-        {
           path: 'chat',
           name: 'ai-chat',
           component: () => import('../views/AIChatView.vue'),

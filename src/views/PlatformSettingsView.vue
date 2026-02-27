@@ -144,6 +144,104 @@
             </div>
           </section>
 
+          <!-- ==================== Members Management ==================== -->
+          <section v-if="activeSection === 'members'">
+            <!-- Toolbar / Search -->
+            <div class="flex items-center mb-4">
+              <input
+                v-model="memberSearchQuery"
+                @input="fetchMembers"
+                type="text"
+                placeholder="搜索用户名或邮箱..."
+                class="px-4 py-2 border border-gray-300 rounded-lg w-64 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              />
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">邮箱</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">加入时间</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="user in memberUsers" :key="user.id">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center">
+                        <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs uppercase mr-3">
+                          {{ user.username.substring(0, 2) }}
+                        </div>
+                        <div class="text-sm font-medium text-gray-900">{{ user.username }}</div>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {{ user.email || '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <span
+                        class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                        :class="{
+                          'bg-purple-100 text-purple-800': user.role === 'OWNER',
+                          'bg-blue-100 text-blue-800': user.role === 'MAINTAINER',
+                          'bg-green-100 text-green-800': user.role === 'DEVELOPER',
+                          'bg-gray-100 text-gray-800': user.role === 'REPORTER'
+                        }"
+                      >
+                        {{ user.role }}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {{ new Date(user.date_joined).toLocaleDateString() }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        v-if="canManageMember(user)"
+                        @click="openMemberEdit(user)"
+                        class="text-blue-600 hover:text-blue-900 mr-3"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        v-if="canDeleteMember(user)"
+                        @click="deleteMember(user)"
+                        class="text-red-600 hover:text-red-900"
+                      >
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Edit Modal -->
+            <div v-if="editingMember" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div class="bg-white rounded-lg p-6 w-96">
+                <h3 class="text-lg font-medium mb-4">编辑角色: {{ editingMember.username }}</h3>
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">角色</label>
+                    <select v-model="editMemberRole" class="mt-1 block w-full pl-3 pr-10 py-2 border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
+                      <option value="REPORTER">Reporter</option>
+                      <option value="DEVELOPER">Developer</option>
+                      <option value="MAINTAINER">Maintainer</option>
+                      <option value="OWNER">Owner</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                  <button @click="editingMember = null" class="px-4 py-2 text-gray-700 border rounded-md hover:bg-gray-50">取消</button>
+                  <button @click="saveMemberRole" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">保存</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
       </div>
     </div>
 
@@ -155,21 +253,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { Link, Shield, Loader2, Info } from 'lucide-vue-next'
+import { Link, Shield, Users, Loader2, Info } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 // ==================== Sidebar Navigation ====================
-const activeSection = ref('feishu')
+const route = useRoute()
+const validTabs = ['feishu', 'permissions', 'members']
+const activeSection = ref((route.query.tab as string) && validTabs.indexOf(route.query.tab as string) >= 0 ? (route.query.tab as string) : 'feishu')
+
+watch(() => route.query.tab, (tab) => {
+  if (tab && validTabs.indexOf(tab as string) >= 0) {
+    activeSection.value = tab as string
+  }
+})
 
 const navItems = [
   { key: 'feishu', label: '飞书集成', icon: Link },
   { key: 'permissions', label: '角色与权限', icon: Shield },
+  { key: 'members', label: '成员管理', icon: Users },
 ]
 
 const sectionMeta: Record<string, { title: string; subtitle: string }> = {
   feishu:      { title: '飞书集成',   subtitle: '配置飞书 OAuth 登录和通知' },
   permissions: { title: '角色与权限', subtitle: '管理不同角色的操作权限' },
+  members:     { title: '成员管理',   subtitle: '管理平台用户及角色' },
 }
 
 const currentSectionMeta = computed(() => sectionMeta[activeSection.value] || { title: '', subtitle: '' })
@@ -274,12 +384,6 @@ const DEFAULT_MATRIX: Record<string, string> = {
   'task.operate_all':      'MAINTAINER',
   'task.delete_own':       'REPORTER',
   'task.delete_all':       'MAINTAINER',
-  'scheduled_task.view':       'REPORTER',
-  'scheduled_task.create':     'REPORTER',
-  'scheduled_task.edit_own':   'REPORTER',
-  'scheduled_task.edit_all':   'MAINTAINER',
-  'scheduled_task.delete_own': 'REPORTER',
-  'scheduled_task.delete_all': 'MAINTAINER',
   'component.view':        'REPORTER',
   'component.edit':        'MAINTAINER',
   'agent.chat':            'OWNER',
@@ -309,21 +413,13 @@ const permissionGroups = [
     { key: 'workflow.delete_own', label: '删除工作流', description: '仅自己的' },
     { key: 'workflow.delete_all', label: '删除工作流', description: '所有' },
   ]},
-  { name: '任务', permissions: [
+  { name: '任务 / 定时计划 / Webhook', permissions: [
     { key: 'task.view', label: '查看任务' },
     { key: 'task.create', label: '创建/执行任务' },
-    { key: 'task.operate_own', label: '操作任务', description: '暂停/恢复/撤销自己的' },
-    { key: 'task.operate_all', label: '操作任务', description: '暂停/恢复/撤销所有' },
+    { key: 'task.operate_own', label: '操作/编辑/启停', description: '仅自己的' },
+    { key: 'task.operate_all', label: '操作/编辑/启停', description: '所有' },
     { key: 'task.delete_own', label: '删除任务', description: '仅自己的' },
     { key: 'task.delete_all', label: '删除任务', description: '所有' },
-  ]},
-  { name: '定时/计划/Webhook 任务', permissions: [
-    { key: 'scheduled_task.view', label: '查看' },
-    { key: 'scheduled_task.create', label: '创建' },
-    { key: 'scheduled_task.edit_own', label: '编辑/启停', description: '仅自己的' },
-    { key: 'scheduled_task.edit_all', label: '编辑/启停', description: '所有' },
-    { key: 'scheduled_task.delete_own', label: '删除', description: '仅自己的' },
-    { key: 'scheduled_task.delete_all', label: '删除', description: '所有' },
   ]},
   { name: '组件 / AI', permissions: [
     { key: 'component.view', label: '查看组件' },
@@ -394,8 +490,74 @@ const resetToDefault = () => {
   permMatrix.value = { ...DEFAULT_MATRIX }
 }
 
+// ==================== Members Management ====================
+const authStore = useAuthStore()
+const memberUsers = ref<any[]>([])
+const memberSearchQuery = ref('')
+const editingMember = ref<any>(null)
+const editMemberRole = ref('REPORTER')
+
+const fetchMembers = async () => {
+    try {
+        const params: any = {}
+        if (memberSearchQuery.value) params.username = memberSearchQuery.value
+        const response = await axios.get('/api/auth/users/', { params })
+        memberUsers.value = response.data.results || response.data
+    } catch (e) {
+        console.error('Failed to fetch users', e)
+    }
+}
+
+const canManageMember = (targetUser: any) => {
+    const currentUser = authStore.user
+    if (!currentUser) return false
+    if (currentUser.role !== 'MAINTAINER' && currentUser.role !== 'OWNER') return false
+    if (targetUser.role === 'OWNER') return false
+    if (currentUser.role === 'MAINTAINER' && targetUser.role === 'MAINTAINER') return false
+    return true
+}
+
+const canDeleteMember = (targetUser: any) => {
+    return canManageMember(targetUser) && targetUser.id !== authStore.user.id
+}
+
+const openMemberEdit = (user: any) => {
+    editingMember.value = user
+    editMemberRole.value = user.role
+}
+
+const saveMemberRole = async () => {
+    if (!editingMember.value) return
+    try {
+        await axios.patch(`/api/auth/users/${editingMember.value.id}/`, {
+            platform_role: editMemberRole.value
+        })
+        editingMember.value = null
+        showToast('角色已更新')
+        fetchMembers()
+    } catch (e) {
+        showToast('更新角色失败', 'error')
+        console.error(e)
+    }
+}
+
+const deleteMember = async (user: any) => {
+    if (!confirm(`确定要删除用户 ${user.username} 吗？此操作不可撤销。`)) return
+    try {
+        await axios.delete(`/api/auth/users/${user.id}/`)
+        showToast('用户已删除')
+        fetchMembers()
+    } catch (e) {
+        showToast('删除用户失败', 'error')
+    }
+}
+
 // ==================== Init ====================
 onMounted(() => {
     fetchConfig()
+    fetchMembers()
+    if (!authStore.user?.role) {
+        authStore.fetchUser()
+    }
 })
 </script>

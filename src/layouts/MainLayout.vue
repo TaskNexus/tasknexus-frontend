@@ -172,7 +172,6 @@ const navItems = computed(() => {
           { name: t('nav.webhookTasks'), to: '/tasks/webhook', routeName: 'tasks-webhook' },
       ]
   },
-  { name: t('nav.members'), to: '/members', routeName: 'platform-members', icon: Users },
   { name: t('nav.clientAgents'), to: '/client-agents', routeName: 'client-agents', icon: Server },
   ]
   // Maintainer+ only: Platform Settings (includes permissions matrix)
