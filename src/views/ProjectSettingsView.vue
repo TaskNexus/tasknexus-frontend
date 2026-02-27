@@ -250,6 +250,120 @@
                 </div>
             </section>
 
+            <!-- MCP Services -->
+            <section class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-4 pb-2 border-b cursor-pointer select-none" @click="toggleSection('mcp')">
+                    <h2 class="text-lg font-medium text-gray-900 flex items-center gap-2">
+                        <component :is="collapsedSections.mcp ? ChevronRight : ChevronDown" class="w-5 h-5 text-gray-500" />
+                        MCP Services
+                    </h2>
+                    <button @click.stop="addMCPServer" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
+                        + Add Server
+                    </button>
+                </div>
+                
+                <div v-show="!collapsedSections.mcp">
+                    <p class="text-sm text-gray-500 mb-4">Configure MCP (Model Context Protocol) servers to extend AI capabilities. Connected tools will be available in AI Chat.</p>
+                    
+                    <div v-if="mcpServers.length === 0" class="text-center py-8 text-gray-400 text-sm">
+                        No MCP servers configured. Click "Add Server" to add one.
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div v-for="(srv, sIndex) in mcpServers" :key="sIndex" class="border rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-3">
+                                    <button 
+                                        @click="srv.enabled = !srv.enabled"
+                                        :class="[
+                                            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                                            srv.enabled ? 'bg-blue-600' : 'bg-gray-300'
+                                        ]"
+                                    >
+                                        <span 
+                                            :class="[
+                                                'inline-block h-3 w-3 transform rounded-full bg-white transition-transform',
+                                                srv.enabled ? 'translate-x-5' : 'translate-x-1'
+                                            ]"
+                                        />
+                                    </button>
+                                    <input 
+                                        v-model="srv.name" 
+                                        type="text" 
+                                        placeholder="Server Name (e.g., Browser Automation)"
+                                        class="text-sm font-medium text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1"
+                                    />
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button @click="testMCPServer(sIndex)" :disabled="srv.testing" class="text-xs text-blue-600 hover:text-blue-800 border border-blue-300 rounded px-2 py-1 disabled:opacity-50">
+                                        {{ srv.testing ? 'Testing...' : 'Test Connection' }}
+                                    </button>
+                                    <button @click="removeMCPServer(sIndex)" class="text-red-500 hover:text-red-700 text-xs">
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Server ID</label>
+                                    <input 
+                                        v-model="srv.id" 
+                                        type="text" 
+                                        placeholder="browser (unique identifier)"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+                                    />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">SSE URL</label>
+                                    <input 
+                                        v-model="srv.url" 
+                                        type="text" 
+                                        placeholder="http://mcp-browser:3001/sse"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Description</label>
+                                <input 
+                                    v-model="srv.description" 
+                                    type="text" 
+                                    placeholder="Brief description of what this server does"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+                                />
+                            </div>
+                            
+                            <!-- Test Result -->
+                            <div v-if="srv.testResult" class="mt-3 p-3 rounded text-sm" :class="srv.testResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'">
+                                <div v-if="srv.testResult.success">
+                                    <span class="font-medium">✓ Connected</span> — {{ srv.testResult.tools_count }} tools available
+                                    <div v-if="srv.testResult.tools?.length" class="mt-2 flex flex-wrap gap-1">
+                                        <span v-for="t in srv.testResult.tools" :key="t.name" class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">
+                                            {{ t.name }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div v-else>
+                                    <span class="font-medium">✗ Failed</span> — {{ srv.testResult.error }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end mt-4">
+                        <button 
+                            @click="saveMCPConfig" 
+                            :disabled="savingMCP"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {{ savingMCP ? 'Saving...' : 'Save MCP Settings' }}
+                        </button>
+                    </div>
+                </div>
+            </section>
+
             <!-- Global Parameters Settings -->
             <section class="bg-white rounded-lg shadow p-6">
                 <div class="flex items-center justify-between mb-4 pb-2 border-b cursor-pointer select-none" @click="toggleSection('global')">
@@ -468,6 +582,7 @@ const collapsedSections = reactive({
     general: false,
     members: false,
     ai: true,
+    mcp: true,     // Default collapsed
     network: true, // Default collapsed
     global: true, // Default collapsed
     tags: true,   // Default collapsed
@@ -571,6 +686,76 @@ const removeGlobalParam = (index: number) => {
     globalParams.value.splice(index, 1)
 }
 
+// MCP Servers State
+interface MCPServer {
+    id: string
+    name: string
+    url: string
+    enabled: boolean
+    description: string
+    testing?: boolean
+    testResult?: any
+}
+const mcpServers = ref<MCPServer[]>([])
+const savingMCP = ref(false)
+
+const addMCPServer = () => {
+    mcpServers.value.push({
+        id: '',
+        name: '',
+        url: '',
+        enabled: true,
+        description: '',
+    })
+}
+
+const removeMCPServer = (index: number) => {
+    mcpServers.value.splice(index, 1)
+}
+
+const testMCPServer = async (index: number) => {
+    const srv = mcpServers.value[index]
+    if (!srv.url) {
+        alert('Please enter an SSE URL first')
+        return
+    }
+    srv.testing = true
+    srv.testResult = null
+    try {
+        const { data } = await axios.post('/api/mcp/test/', { url: srv.url })
+        srv.testResult = data
+    } catch (e: any) {
+        srv.testResult = { success: false, error: e.response?.data?.detail || 'Connection failed' }
+    } finally {
+        srv.testing = false
+    }
+}
+
+const saveMCPConfig = async () => {
+    savingMCP.value = true
+    try {
+        // Clean transient fields before saving
+        const cleanServers = mcpServers.value.map(s => ({
+            id: s.id,
+            name: s.name,
+            url: s.url,
+            enabled: s.enabled,
+            description: s.description,
+        }))
+        mcpServers.value.forEach(s => { delete s.testing; delete s.testResult })
+        
+        await axios.patch(`/api/projects/${projectId}/`, {
+            extra_config: { ...getExtraConfig(), mcp_servers: cleanServers }
+        })
+        alert('MCP settings saved successfully')
+    } catch (e: any) {
+        console.error("Failed to save MCP config", e)
+        alert(e.response?.data?.detail || 'Failed to save MCP settings')
+    } finally {
+        savingMCP.value = false
+    }
+}
+
 // Client Agent Config State
 const agentRepoUrl = ref('')
 const agentRepoToken = ref('')
@@ -598,6 +783,10 @@ const getExtraConfig = () => {
         model_groups: modelGroups.value,
         global_params: globalParams.value,
         workflow_tags: workflowTags.value,
+        mcp_servers: mcpServers.value.map(s => ({
+            id: s.id, name: s.name, url: s.url,
+            enabled: s.enabled, description: s.description,
+        })),
         proxy_url: proxyUrl.value,
         agent_repo_url: agentRepoUrl.value,
         agent_repo_token: agentRepoToken.value,
@@ -647,6 +836,9 @@ const fetchProject = async () => {
             }
             if (data.extra_config.agent_repo_ref) {
                 agentRepoRef.value = data.extra_config.agent_repo_ref
+            }
+            if (Array.isArray(data.extra_config.mcp_servers)) {
+                mcpServers.value = data.extra_config.mcp_servers
             }
         }
     } catch (e) {

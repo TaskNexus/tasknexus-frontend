@@ -102,43 +102,82 @@
 
         <!-- Message List -->
         <div v-else class="max-w-4xl mx-auto space-y-6">
-          <div v-for="(msg, index) in visibleMessages" :key="index" class="flex gap-4" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
-            <!-- Avatar for AI -->
-            <div v-if="msg.role === 'assistant'" class="w-8 h-8 rounded-full bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
-              <Bot class="w-5 h-5 text-green-600" />
-            </div>
-
-            <!-- Message Bubble -->
-            <div 
-              class="max-w-[85%] rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden"
-              :class="msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none px-5 py-3.5' : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'"
-            >
-                <div v-if="msg.role === 'user'">
-                    <div class="markdown-content" v-html="renderMarkdown(msg.content)"></div>
+          <div v-for="(msg, index) in visibleMessages" :key="index">
+            <!-- Tool Call Block -->
+            <div v-if="msg.role === 'tool_call'" class="ml-12">
+              <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden text-sm">
+                <div 
+                  @click="msg.isThinkingCollapsed = !msg.isThinkingCollapsed"
+                  class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                >
+                  <component :is="msg.isThinkingCollapsed ? ChevronRight : ChevronDown" class="w-4 h-4 text-gray-400" />
+                  <span class="text-amber-600">⚡</span>
+                  <span class="font-medium text-gray-700">Tool Calls</span>
+                  <span class="text-gray-400 text-xs">
+                    {{ msg.toolCalls ? msg.toolCalls.map((c: any) => c.name.split('__').pop()).join(', ') : '' }}
+                  </span>
+                  <span v-if="msg.toolStatus === 'done'" class="ml-auto text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✓ Done</span>
+                  <Loader2 v-else class="ml-auto w-3.5 h-3.5 animate-spin text-amber-500" />
                 </div>
-                <div v-else class="flex flex-col">
-                    <!-- Thinking Block -->
-                    <div v-if="msg.thought" class="border-b border-gray-100">
-                        <div 
-                            @click="msg.isThinkingCollapsed = !msg.isThinkingCollapsed"
-                            class="flex items-center gap-2 px-4 py-2 cursor-pointer select-none hover:bg-gray-50 transition-colors rounded-t-lg"
-                        >
-                            <component :is="msg.isThinkingCollapsed ? ChevronRight : ChevronDown" class="w-4 h-4 text-gray-400" />
-                            <span class="text-xs font-medium text-gray-400">{{ msg.thoughtTime || 'Process' }}</span>
-                        </div>
-                        <div v-show="!msg.isThinkingCollapsed" class="px-4 py-2 text-gray-400 text-sm leading-relaxed whitespace-pre-wrap border-l-2 border-gray-200 ml-4 mb-2">
-{{ msg.thought }}
-                        </div>
+                <div v-show="!msg.isThinkingCollapsed" class="border-t border-gray-200">
+                  <div v-for="(call, ci) in (msg.toolCalls || [])" :key="ci" class="border-b border-gray-100 last:border-b-0">
+                    <div class="px-4 py-2 bg-white">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs font-mono font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">{{ call.name.split('__').pop() }}</span>
+                      </div>
+                      <div v-if="call.arguments && Object.keys(call.arguments).length" class="mt-1">
+                        <div class="text-xs text-gray-500 mb-1">Arguments:</div>
+                        <pre class="text-xs bg-gray-50 rounded p-2 overflow-x-auto text-gray-600">{{ JSON.stringify(call.arguments, null, 2) }}</pre>
+                      </div>
                     </div>
-                    
-                    <!-- Main Content -->
-                    <div class="px-5 py-3.5 markdown-content" v-html="renderMarkdown(msg.mainContent)"></div>
+                    <div v-if="msg.toolResults && msg.toolResults[ci]" class="px-4 py-2 bg-green-50/50">
+                      <div class="text-xs text-green-700 mb-1">Result:</div>
+                      <pre class="text-xs bg-white rounded p-2 overflow-x-auto text-gray-600 max-h-40 overflow-y-auto">{{ msg.toolResults[ci].content }}</pre>
+                    </div>
+                  </div>
                 </div>
+              </div>
             </div>
 
-            <!-- Avatar for User -->
-            <div v-if="msg.role === 'user'" class="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
-              <User class="w-5 h-5 text-blue-600" />
+            <!-- Regular Message -->
+            <div v-else class="flex gap-4" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+              <!-- Avatar for AI -->
+              <div v-if="msg.role === 'assistant'" class="w-8 h-8 rounded-full bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
+                <Bot class="w-5 h-5 text-green-600" />
+              </div>
+
+              <!-- Message Bubble -->
+              <div 
+                class="max-w-[85%] rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden"
+                :class="msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none px-5 py-3.5' : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'"
+              >
+                  <div v-if="msg.role === 'user'">
+                      <div class="markdown-content" v-html="renderMarkdown(msg.content)"></div>
+                  </div>
+                  <div v-else class="flex flex-col">
+                      <!-- Thinking Block -->
+                      <div v-if="msg.thought" class="border-b border-gray-100">
+                          <div 
+                              @click="msg.isThinkingCollapsed = !msg.isThinkingCollapsed"
+                              class="flex items-center gap-2 px-4 py-2 cursor-pointer select-none hover:bg-gray-50 transition-colors rounded-t-lg"
+                          >
+                              <component :is="msg.isThinkingCollapsed ? ChevronRight : ChevronDown" class="w-4 h-4 text-gray-400" />
+                              <span class="text-xs font-medium text-gray-400">{{ msg.thoughtTime || 'Process' }}</span>
+                          </div>
+                          <div v-show="!msg.isThinkingCollapsed" class="px-4 py-2 text-gray-400 text-sm leading-relaxed whitespace-pre-wrap border-l-2 border-gray-200 ml-4 mb-2">
+{{ msg.thought }}
+                          </div>
+                      </div>
+                      
+                      <!-- Main Content -->
+                      <div class="px-5 py-3.5 markdown-content" v-html="renderMarkdown(msg.mainContent)"></div>
+                  </div>
+              </div>
+
+              <!-- Avatar for User -->
+              <div v-if="msg.role === 'user'" class="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
+                <User class="w-5 h-5 text-blue-600" />
+              </div>
             </div>
           </div>
           
@@ -225,7 +264,15 @@ const selectedModel = ref<string>('')
 const modelGroups = ref<any[]>([])
 const availableModels = ref<any[]>([])
 
-const messages = ref<Array<{role: string, content: string}>>([])
+interface ChatMessage {
+    role: string
+    content: string
+    toolCalls?: Array<{name: string, arguments: Record<string, any>}>
+    toolResults?: Array<{name: string, content: string}>
+    toolStatus?: string
+}
+
+const messages = ref<ChatMessage[]>([])
 
 interface ParsedMessage {
     role: string
@@ -234,12 +281,32 @@ interface ParsedMessage {
     thoughtTime?: string
     mainContent: string
     isThinkingCollapsed: boolean
+    toolCalls?: Array<{name: string, arguments: Record<string, any>}>
+    toolResults?: Array<{name: string, content: string}>
+    toolStatus?: string
 }
 
 const visibleMessages = computed<ParsedMessage[]>(() => {
     return messages.value
-        .filter(m => m.role !== 'tool')
+        .filter(m => {
+            if (m.role === 'tool') return false
+            if (m.role === 'tool_call') return true
+            return m.content && m.content.trim()
+        })
         .map(m => {
+            // Tool call messages
+            if (m.role === 'tool_call') {
+                return {
+                    role: 'tool_call',
+                    content: '',
+                    mainContent: '',
+                    isThinkingCollapsed: true,
+                    toolCalls: m.toolCalls,
+                    toolResults: m.toolResults,
+                    toolStatus: m.toolStatus || 'calling'
+                }
+            }
+
             if (m.role === 'user') {
                 return {
                     role: m.role,
@@ -260,9 +327,9 @@ const visibleMessages = computed<ParsedMessage[]>(() => {
                     role: m.role,
                     content: m.content,
                     thought: thought,
-                    thoughtTime: 'Thinking...', // Could be calculated if we tracked it
+                    thoughtTime: 'Thinking...',
                     mainContent: mainContent,
-                    isThinkingCollapsed: false // Auto-expand by default for new messages? Or collapse?
+                    isThinkingCollapsed: false
                 }
             }
 
@@ -474,10 +541,31 @@ const sendMessage = async () => {
                             
                             if (event.type === 'message') {
                                 // Add message to UI immediately
+                                if (event.content && event.content.trim()) {
+                                    messages.value.push({
+                                        role: event.role,
+                                        content: event.content
+                                    })
+                                    await scrollToBottom()
+                                }
+                            } else if (event.type === 'tool_call') {
+                                // Add tool call detail block
                                 messages.value.push({
-                                    role: event.role,
-                                    content: event.content
+                                    role: 'tool_call',
+                                    content: '',
+                                    toolCalls: event.calls || [],
+                                    toolStatus: 'calling'
                                 })
+                                await scrollToBottom()
+                            } else if (event.type === 'tool_result') {
+                                // Find the last tool_call message and update it with results
+                                for (let i = messages.value.length - 1; i >= 0; i--) {
+                                    if (messages.value[i].role === 'tool_call' && messages.value[i].toolStatus === 'calling') {
+                                        messages.value[i].toolResults = event.results || []
+                                        messages.value[i].toolStatus = 'done'
+                                        break
+                                    }
+                                }
                                 await scrollToBottom()
                             } else if (event.type === 'done') {
                                 // Update session info
