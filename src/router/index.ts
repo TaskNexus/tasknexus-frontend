@@ -137,11 +137,15 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else {
+    // 页面刷新后 token 还在但 user 信息丢失，需要重新获取
+    if (authStore.isAuthenticated && !authStore.user) {
+      await authStore.fetchUser()
+    }
     next()
   }
 })
