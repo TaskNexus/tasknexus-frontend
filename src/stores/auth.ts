@@ -24,6 +24,12 @@ const processQueue = (error: unknown, token: string | null = null) => {
 }
 
 axios.interceptors.request.use(config => {
+    // Don't add Authorization header for token refresh requests —
+    // an expired JWT in the header would cause Django's JWTAuthentication
+    // to reject the request with 401 before the view processes the refresh token.
+    if (config.url?.includes('token/refresh')) {
+        return config
+    }
     const token = localStorage.getItem('accessToken')
     if (token) {
         config.headers.Authorization = `Bearer ${token}`
@@ -212,6 +218,33 @@ export const useAuthStore = defineStore('auth', {
             } catch (error) {
                 console.error('Feishu login callback failed', error)
                 router.push('/login')
+                return false
+            }
+        },
+        /**
+         * Try auto-login using the existing refresh token.
+         * Called from the login page and router guard to silently restore sessions.
+         * Returns true if auto-login succeeded.
+         */
+        async tryAutoLogin(): Promise<boolean> {
+            const refreshToken = localStorage.getItem('refreshToken')
+            if (!refreshToken) return false
+
+            try {
+                const response = await axios.post('/api/auth/token/refresh/', {
+                    refresh: refreshToken,
+                })
+                this.accessToken = response.data.access
+                localStorage.setItem('accessToken', this.accessToken as string)
+
+                await this.fetchUser()
+                return true
+            } catch {
+                // Refresh token is also expired or invalid — clean up
+                this.accessToken = null
+                this.refreshToken = null
+                localStorage.removeItem('accessToken')
+                localStorage.removeItem('refreshToken')
                 return false
             }
         },
