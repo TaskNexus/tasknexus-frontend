@@ -155,8 +155,13 @@ router.beforeEach(async (to, from, next) => {
     next('/login')
   } else {
     // 页面刷新后 token 还在但 user 信息丢失，需要重新获取
+    // 401 拦截器会自动尝试用 refresh token 刷新 access token
     if (authStore.isAuthenticated && !authStore.user) {
-      await authStore.fetchUser()
+      try {
+        await authStore.fetchUser()
+      } catch {
+        // fetchUser failed and token refresh also failed — user will be logged out by interceptor
+      }
     }
     next()
   }

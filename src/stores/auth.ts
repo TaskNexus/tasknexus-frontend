@@ -5,6 +5,24 @@ import router from '@/router'
 // Configure default axios base URL
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || ''
 
+// Flag to prevent multiple concurrent refresh attempts
+let isRefreshing = false
+let failedQueue: Array<{
+    resolve: (value?: unknown) => void
+    reject: (reason?: unknown) => void
+}> = []
+
+const processQueue = (error: unknown, token: string | null = null) => {
+    failedQueue.forEach((prom) => {
+        if (error) {
+            prom.reject(error)
+        } else {
+            prom.resolve(token)
+        }
+    })
+    failedQueue = []
+}
+
 axios.interceptors.request.use(config => {
     const token = localStorage.getItem('accessToken')
     if (token) {
@@ -13,14 +31,65 @@ axios.interceptors.request.use(config => {
     return config
 })
 
-// Add response interceptor to handle auth errors
+// Add response interceptor to handle auth errors with automatic token refresh
 axios.interceptors.response.use(
     (response: any) => response,
-    (error: any) => {
-        if (error.response?.status === 401) {
-            // Token expired or invalid — redirect to login
-            const authStore = useAuthStore()
-            authStore.logout()
+    async (error: any) => {
+        const originalRequest = error.config
+
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            // Don't try to refresh if this was already a refresh request
+            if (originalRequest.url?.includes('token/refresh')) {
+                const authStore = useAuthStore()
+                authStore.logout()
+                return Promise.reject(error)
+            }
+
+            if (isRefreshing) {
+                // Queue the request while refresh is in progress
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject })
+                }).then((token) => {
+                    originalRequest.headers.Authorization = `Bearer ${token}`
+                    return axios(originalRequest)
+                }).catch((err) => {
+                    return Promise.reject(err)
+                })
+            }
+
+            originalRequest._retry = true
+            isRefreshing = true
+
+            const refreshToken = localStorage.getItem('refreshToken')
+            if (!refreshToken) {
+                isRefreshing = false
+                const authStore = useAuthStore()
+                authStore.logout()
+                return Promise.reject(error)
+            }
+
+            try {
+                const response = await axios.post('/api/auth/token/refresh/', {
+                    refresh: refreshToken,
+                })
+                const newAccessToken = response.data.access
+
+                localStorage.setItem('accessToken', newAccessToken)
+                const authStore = useAuthStore()
+                authStore.accessToken = newAccessToken
+
+                processQueue(null, newAccessToken)
+                isRefreshing = false
+
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+                return axios(originalRequest)
+            } catch (refreshError) {
+                processQueue(refreshError, null)
+                isRefreshing = false
+                const authStore = useAuthStore()
+                authStore.logout()
+                return Promise.reject(refreshError)
+            }
         } else if (error.response?.status === 403) {
             // Permission denied — show message, do NOT logout
             const detail = error.response.data?.detail || '权限不足，无法执行此操作'
@@ -29,6 +98,28 @@ axios.interceptors.response.use(
         return Promise.reject(error)
     }
 )
+
+// --- Remember Me credential helpers ---
+const SAVED_CREDENTIALS_KEY = 'savedCredentials'
+
+function saveCredentials(username: string, password: string) {
+    const data = JSON.stringify({ username, password })
+    localStorage.setItem(SAVED_CREDENTIALS_KEY, btoa(data))
+}
+
+function loadCredentials(): { username: string; password: string } | null {
+    const raw = localStorage.getItem(SAVED_CREDENTIALS_KEY)
+    if (!raw) return null
+    try {
+        return JSON.parse(atob(raw))
+    } catch {
+        return null
+    }
+}
+
+function clearCredentials() {
+    localStorage.removeItem(SAVED_CREDENTIALS_KEY)
+}
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -40,14 +131,24 @@ export const useAuthStore = defineStore('auth', {
         isAuthenticated: (state) => !!state.accessToken,
     },
     actions: {
-        async login(credentials: any) {
+        async login(credentials: { username: string; password: string; rememberMe?: boolean }) {
             try {
-                const response = await axios.post('/api/auth/login/', credentials)
+                const response = await axios.post('/api/auth/login/', {
+                    username: credentials.username,
+                    password: credentials.password,
+                })
                 this.accessToken = response.data.access
                 this.refreshToken = response.data.refresh
 
                 localStorage.setItem('accessToken', this.accessToken as string)
                 localStorage.setItem('refreshToken', this.refreshToken as string)
+
+                // Handle remember me
+                if (credentials.rememberMe) {
+                    saveCredentials(credentials.username, credentials.password)
+                } else {
+                    clearCredentials()
+                }
 
                 await this.fetchUser()
 
@@ -75,7 +176,8 @@ export const useAuthStore = defineStore('auth', {
                 })
                 this.user = response.data
             } catch (error) {
-                this.logout()
+                // Don't logout here — the 401 interceptor will handle token refresh
+                throw error
             }
         },
         logout() {
@@ -112,6 +214,13 @@ export const useAuthStore = defineStore('auth', {
                 router.push('/login')
                 return false
             }
-        }
+        },
+        // --- Remember me helpers ---
+        getSavedCredentials() {
+            return loadCredentials()
+        },
+        clearSavedCredentials() {
+            clearCredentials()
+        },
     }
 })

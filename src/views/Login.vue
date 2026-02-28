@@ -44,7 +44,7 @@
 
         <div class="flex items-center justify-between">
           <div class="flex items-center">
-            <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" />
+            <input id="remember-me" name="remember-me" type="checkbox" v-model="rememberMe" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" />
             <label for="remember-me" class="ml-2 block text-sm text-gray-900"> 记住我 </label>
           </div>
 
@@ -122,6 +122,7 @@ import axios from 'axios'
 
 const username = ref('')
 const password = ref('')
+const rememberMe = ref(false)
 const authStore = useAuthStore()
 const loginMode = ref<'password' | 'qrcode'>('password')
 const qrLoading = ref(true)
@@ -142,7 +143,7 @@ declare global {
 }
 
 const handleLogin = async () => {
-  await authStore.login({ username: username.value, password: password.value })
+  await authStore.login({ username: username.value, password: password.value, rememberMe: rememberMe.value })
 }
 
 const handleFeishuLogin = async () => {
@@ -232,6 +233,14 @@ watch(loginMode, (newMode) => {
 
 onMounted(async () => {
   window.addEventListener('message', handleQRMessage)
+  
+  // Load saved credentials if "Remember Me" was checked previously
+  const saved = authStore.getSavedCredentials()
+  if (saved) {
+    username.value = saved.username
+    password.value = saved.password
+    rememberMe.value = true
+  }
   
   // Check if Feishu login is enabled and if registration is enabled
   try {
