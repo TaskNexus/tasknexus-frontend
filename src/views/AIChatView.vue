@@ -51,7 +51,7 @@
               @change="handleProjectChange"
               :disabled="loading"
             >
-              <option :value="null" disabled>Select Project</option>
+              <option :value="null" disabled>选择项目</option>
               <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
             <ChevronDown class="absolute right-3 top-3 w-4 h-4 text-gray-500 pointer-events-none" />
@@ -65,7 +65,7 @@
               :disabled="!selectedProjectId || loading"
               @change="handleGroupChange"
             >
-              <option value="" disabled>Select Model Group</option>
+              <option value="" disabled>选择模型组</option>
               <option v-for="group in modelGroups" :key="group.title" :value="group.title">
                 {{ group.title }}
               </option>
@@ -80,7 +80,7 @@
               class="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 appearance-none cursor-pointer"
               :disabled="loading"
             >
-              <option value="" disabled>Select Model</option>
+              <option value="" disabled>选择模型</option>
               <option v-for="m in availableModels" :key="m.name" :value="m.name">{{ m.name }}</option>
             </select>
             <ChevronDown class="absolute right-3 top-3 w-4 h-4 text-gray-500 pointer-events-none" />
@@ -97,7 +97,7 @@
             <Bot class="w-8 h-8 text-blue-600" />
           </div>
           <h1 class="text-2xl font-semibold text-gray-900 mb-2">Hi, {{ authStore.user?.username || 'User' }}</h1>
-          <p class="text-gray-500">Select a project to start chatting</p>
+          <p class="text-gray-500">选择项目开始对话</p>
         </div>
 
         <!-- Message List -->
@@ -112,7 +112,7 @@
                 >
                   <component :is="msg.isThinkingCollapsed ? ChevronRight : ChevronDown" class="w-4 h-4 text-gray-400" />
                   <span class="text-amber-600">⚡</span>
-                  <span class="font-medium text-gray-700">Tool Calls</span>
+                  <span class="font-medium text-gray-700">工具调用</span>
                   <span class="text-gray-400 text-xs">
                     {{ msg.toolCalls ? msg.toolCalls.map((c: any) => c.name.split('__').pop()).join(', ') : '' }}
                   </span>
@@ -126,12 +126,12 @@
                         <span class="text-xs font-mono font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">{{ call.name.split('__').pop() }}</span>
                       </div>
                       <div v-if="call.arguments && Object.keys(call.arguments).length" class="mt-1">
-                        <div class="text-xs text-gray-500 mb-1">Arguments:</div>
+                        <div class="text-xs text-gray-500 mb-1">参数:</div>
                         <pre class="text-xs bg-gray-50 rounded p-2 overflow-x-auto text-gray-600">{{ JSON.stringify(call.arguments, null, 2) }}</pre>
                       </div>
                     </div>
                     <div v-if="msg.toolResults && msg.toolResults[ci]" class="px-4 py-2 bg-green-50/50">
-                      <div class="text-xs text-green-700 mb-1">Result:</div>
+                      <div class="text-xs text-green-700 mb-1">结果:</div>
                       <pre class="text-xs bg-white rounded p-2 overflow-x-auto text-gray-600 max-h-40 overflow-y-auto">{{ msg.toolResults[ci].content }}</pre>
                     </div>
                   </div>
@@ -204,7 +204,7 @@
             rows="1"
             class="w-full bg-transparent text-gray-900 placeholder-gray-400 px-4 py-4 pr-12 rounded-xl focus:outline-none resize-none overflow-hidden"
             style="min-height: 56px; max-height: 200px;"
-            placeholder="Type your message... (Shift+Enter for new line)"
+            placeholder="输入消息... (Shift+Enter换行)"
             ref="inputRef"
             @input="adjustHeight"
           ></textarea>

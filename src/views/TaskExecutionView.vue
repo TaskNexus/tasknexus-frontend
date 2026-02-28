@@ -5,7 +5,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <div class="flex items-center gap-3">
-                    <h1 class="text-xl font-semibold text-gray-900">{{ task?.name || 'Loading Task...' }}</h1>
+                    <h1 class="text-xl font-semibold text-gray-900">{{ task?.name || '加载中...' }}</h1>
                     <span 
                         v-if="task"
                         class="px-2.5 py-0.5 rounded-full text-xs font-medium border"
@@ -38,7 +38,7 @@
                     class="flex items-center px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-md text-sm font-medium transition-colors"
                 >
                     <Pause class="w-4 h-4 mr-2" />
-                    Pause
+                    暂停
                 </button>
                 <button 
                     v-if="task.status === 'PAUSED'"
@@ -47,7 +47,7 @@
                     class="flex items-center px-4 py-2 bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 rounded-md text-sm font-medium transition-colors"
                 >
                     <Play class="w-4 h-4 mr-2" />
-                    Resume
+                    恢复
                 </button>
                 <button 
                     v-if="['RUNNING', 'PAUSED'].includes(task.status)"
@@ -56,20 +56,20 @@
                     class="flex items-center px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-md text-sm font-medium transition-colors"
                 >
                     <Ban class="w-4 h-4 mr-2" />
-                    Revoke
+                    终止
                 </button>
                 <button 
                     @click="router.push('/workflows/' + task.workflow)"
                     class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md text-sm font-medium transition-colors"
                 >
-                    View Workflow
+                    工作流
                 </button>
             </div>
         </div>
         <div class="text-xs text-gray-400 flex items-center gap-4">
-             <span>ID: {{ task?.id }}</span>
-             <span>Workflow: {{ task?.workflow_name }}</span>
-             <span>Started: {{ formatDate(task?.started_at) }}</span>
+             <span>任务ID: {{ task?.id }}</span>
+             <span>工作流: {{ task?.workflow_name }}</span>
+             <span>开始时间: {{ formatDate(task?.started_at) }}</span>
         </div>
     </div>
 
@@ -243,7 +243,7 @@ const fetchTask = async () => {
         // Init Nav Stack if empty
         if (navStack.value.length === 0 && task.value.workflow) {
             navStack.value.push({
-                label: 'Root',
+                label: '父节点',
                 workflowId: task.value.workflow,
                 subprocessNodeId: null
             })

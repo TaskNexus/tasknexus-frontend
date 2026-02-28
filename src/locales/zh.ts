@@ -23,7 +23,7 @@ export default {
         scheduledTasks: '计划任务',
         webhookTasks: 'Webhook 任务',
         members: '成员管理',
-        aiChat: '智能体',
+        aiChat: '智能平台',
         clientAgents: '客户端 Agent'
     },
     home: {
