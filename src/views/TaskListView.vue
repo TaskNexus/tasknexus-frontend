@@ -86,7 +86,7 @@
                     <th class="py-3 font-medium text-center">状态</th>
                     <th class="py-3 font-medium">开始时间</th>
                     <th class="py-3 font-medium">结束时间</th>
-                    <th class="py-3 font-medium w-32 text-center">Action</th>
+                    <th class="py-3 font-medium w-32 text-center">操作</th>
                 </tr>
             </thead>
             <tbody class="text-sm text-gray-700">

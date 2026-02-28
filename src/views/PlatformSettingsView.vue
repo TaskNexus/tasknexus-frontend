@@ -242,6 +242,138 @@
             </div>
           </section>
 
+          <!-- ==================== Registration Settings ==================== -->
+          <section v-if="activeSection === 'registration'">
+            <p class="text-sm text-gray-500 mb-4">控制手动注册开关和邀请链接管理。关闭手动注册后，仅可通过邀请链接或飞书登录加入平台。</p>
+
+            <!-- Registration Toggle -->
+            <div class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg mb-6">
+              <div>
+                <label class="text-sm font-medium text-gray-700">开放手动注册</label>
+                <p class="text-xs text-gray-400 mt-0.5">关闭后登录页将隐藏注册入口，飞书登录和邀请链接不受影响</p>
+              </div>
+              <button
+                @click="registrationForm.registration_enabled = !registrationForm.registration_enabled"
+                :class="['relative inline-flex h-6 w-11 items-center rounded-full transition-colors', registrationForm.registration_enabled ? 'bg-blue-600' : 'bg-gray-300']"
+              >
+                <span :class="['inline-block h-4 w-4 transform rounded-full bg-white transition-transform', registrationForm.registration_enabled ? 'translate-x-6' : 'translate-x-1']" />
+              </button>
+            </div>
+
+            <div class="flex justify-end pb-6 mb-6 border-b border-gray-100">
+              <button @click="saveRegistrationConfig" :disabled="savingRegistration" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm">
+                {{ savingRegistration ? '保存中...' : '保存注册设置' }}
+              </button>
+            </div>
+
+            <!-- Invite Links Management -->
+            <h3 class="text-base font-semibold text-gray-800 mb-3">邀请链接管理</h3>
+            <p class="text-sm text-gray-500 mb-4">邀请链接不受注册开关限制，但仍需邮箱验证码。</p>
+
+            <!-- Create Invite -->
+            <div class="flex items-end gap-3 mb-4 p-4 bg-gray-50 rounded-lg">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">有效期（小时）</label>
+                <input v-model.number="inviteFormHours" type="number" min="1" max="8760" class="w-24 px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">可使用次数</label>
+                <input v-model.number="inviteFormMaxUses" type="number" min="1" max="9999" class="w-24 px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <button @click="createInvite" :disabled="creatingInvite" class="px-4 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm">
+                {{ creatingInvite ? '生成中...' : '生成邀请链接' }}
+              </button>
+            </div>
+
+            <!-- Invite List -->
+            <div class="overflow-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">邀请链接</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">创建者</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">使用/上限</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">过期时间</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="inv in invites" :key="inv.id">
+                    <td class="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">
+                      {{ getInviteUrl(inv.token) }}
+                    </td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ inv.created_by_username }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ inv.used_count }} / {{ inv.max_uses }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ new Date(inv.expires_at).toLocaleString() }}</td>
+                    <td class="px-4 py-2">
+                      <span class="px-2 py-0.5 text-xs font-medium rounded-full" :class="inv.is_valid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'">
+                        {{ inv.is_valid ? '有效' : '已失效' }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-2 text-right text-sm">
+                      <button @click="copyInviteUrl(inv.token)" class="text-blue-600 hover:text-blue-800 mr-2">复制</button>
+                      <button v-if="inv.is_active" @click="revokeInvite(inv.id)" class="text-red-600 hover:text-red-800">撤销</button>
+                    </td>
+                  </tr>
+                  <tr v-if="invites.length === 0">
+                    <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-400">暂无邀请链接</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ==================== Email Config ==================== -->
+          <section v-if="activeSection === 'email'">
+            <p class="text-sm text-gray-500 mb-4">配置 SMTP 邮件服务器，用于发送注册验证码等邮件。</p>
+
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">SMTP 服务器</label>
+                  <input v-model="emailForm.smtp_host" type="text" placeholder="smtp.example.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">端口</label>
+                  <input v-model.number="emailForm.smtp_port" type="number" placeholder="587" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">SMTP 用户名</label>
+                <input v-model="emailForm.smtp_user" type="text" placeholder="user@example.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">SMTP 密码</label>
+                <input v-model="emailForm.smtp_password" type="password" placeholder="输入新密码（留空保持不变）" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+                <p v-if="maskedSmtpPassword" class="mt-1 text-xs text-gray-400">当前值: {{ maskedSmtpPassword }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">发件人地址</label>
+                <input v-model="emailForm.from_email" type="email" placeholder="noreply@example.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+                <p class="mt-1 text-xs text-gray-400">留空则使用 SMTP 用户名作为发件人</p>
+              </div>
+              <div class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">启用 TLS</label>
+                  <p class="text-xs text-gray-400 mt-0.5">大多数邮件服务商要求启用TLS</p>
+                </div>
+                <button
+                  @click="emailForm.smtp_use_tls = !emailForm.smtp_use_tls"
+                  :class="['relative inline-flex h-6 w-11 items-center rounded-full transition-colors', emailForm.smtp_use_tls ? 'bg-blue-600' : 'bg-gray-300']"
+                >
+                  <span :class="['inline-block h-4 w-4 transform rounded-full bg-white transition-transform', emailForm.smtp_use_tls ? 'translate-x-6' : 'translate-x-1']" />
+                </button>
+              </div>
+            </div>
+
+            <div class="flex justify-end pt-4 mt-4 border-t border-gray-100">
+              <button @click="saveEmailConfig" :disabled="savingEmail" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {{ savingEmail ? '保存中...' : '保存邮件配置' }}
+              </button>
+            </div>
+          </section>
+
           <!-- ==================== Client Agents ==================== -->
           <section v-if="activeSection === 'agents'">
             <ClientAgentDetailView
@@ -269,14 +401,14 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { Link, Shield, Users, Server, Loader2, Info } from 'lucide-vue-next'
+import { Link, Shield, Users, Server, Loader2, Info, UserPlus, Mail } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import ClientAgentListView from '@/views/ClientAgentListView.vue'
 import ClientAgentDetailView from '@/views/ClientAgentDetailView.vue'
 
 // ==================== Sidebar Navigation ====================
 const route = useRoute()
-const validTabs = ['feishu', 'permissions', 'members', 'agents']
+const validTabs = ['feishu', 'permissions', 'members', 'registration', 'email', 'agents']
 const activeSection = ref((route.query.tab as string) && validTabs.indexOf(route.query.tab as string) >= 0 ? (route.query.tab as string) : 'feishu')
 const selectedAgentId = ref<number | null>(null)
 
@@ -290,14 +422,18 @@ const navItems = [
   { key: 'feishu', label: '飞书集成', icon: Link },
   { key: 'permissions', label: '角色与权限', icon: Shield },
   { key: 'members', label: '成员管理', icon: Users },
+  { key: 'registration', label: '注册设置', icon: UserPlus },
+  { key: 'email', label: '邮件配置', icon: Mail },
   { key: 'agents', label: '客户端代理', icon: Server },
 ]
 
 const sectionMeta: Record<string, { title: string; subtitle: string }> = {
-  feishu:      { title: '飞书集成',   subtitle: '配置飞书 OAuth 登录和通知' },
-  permissions: { title: '角色与权限', subtitle: '管理不同角色的操作权限' },
-  members:     { title: '成员管理',   subtitle: '管理平台用户及角色' },
-  agents:      { title: '客户端代理', subtitle: '管理客户端代理和工作空间' },
+  feishu:        { title: '飞书集成',   subtitle: '配置飞书 OAuth 登录和通知' },
+  permissions:   { title: '角色与权限', subtitle: '管理不同角色的操作权限' },
+  members:       { title: '成员管理',   subtitle: '管理平台用户及角色' },
+  registration:  { title: '注册设置',   subtitle: '管理注册开关和邀请链接' },
+  email:         { title: '邮件配置',   subtitle: '配置 SMTP 邮件服务器' },
+  agents:        { title: '客户端代理', subtitle: '管理客户端代理和工作空间' },
 }
 
 const currentSectionMeta = computed(() => sectionMeta[activeSection.value] || { title: '', subtitle: '' })
@@ -328,6 +464,20 @@ const fetchConfig = async () => {
             feishuForm.value.login_enabled = data.feishu.login_enabled || false
             maskedSecret.value = data.feishu.app_secret || ''
             feishuForm.value.app_secret = ''
+        }
+        // Load registration config
+        if (data.registration) {
+            registrationForm.value.registration_enabled = data.registration.registration_enabled ?? true
+        }
+        // Load email config
+        if (data.email) {
+            emailForm.value.smtp_host = data.email.smtp_host || ''
+            emailForm.value.smtp_port = data.email.smtp_port || 587
+            emailForm.value.smtp_user = data.email.smtp_user || ''
+            emailForm.value.smtp_use_tls = data.email.smtp_use_tls ?? true
+            emailForm.value.from_email = data.email.from_email || ''
+            maskedSmtpPassword.value = data.email.smtp_password || ''
+            emailForm.value.smtp_password = ''
         }
         // Load permission matrix from config
         if (data.permission_matrix && typeof data.permission_matrix === 'object') {
@@ -570,10 +720,138 @@ const deleteMember = async (user: any) => {
     }
 }
 
+// ==================== Registration Settings ====================
+const registrationForm = ref({
+    registration_enabled: true,
+})
+const savingRegistration = ref(false)
+
+const saveRegistrationConfig = async () => {
+    savingRegistration.value = true
+    try {
+        const res = await axios.get('/api/platform/config/')
+        const existing = res.data || {}
+        await axios.put('/api/platform/config/', {
+            ...existing,
+            registration: {
+                registration_enabled: registrationForm.value.registration_enabled,
+            }
+        })
+        showToast('注册设置已保存')
+    } catch (e: any) {
+        showToast(e.response?.data?.detail || '保存失败', 'error')
+    } finally {
+        savingRegistration.value = false
+    }
+}
+
+// ==================== Invite Links ====================
+const invites = ref<any[]>([])
+const inviteFormHours = ref(168)
+const inviteFormMaxUses = ref(1)
+const creatingInvite = ref(false)
+
+const fetchInvites = async () => {
+    try {
+        const { data } = await axios.get('/api/platform/invites/')
+        invites.value = data.results || data
+    } catch (e) {
+        console.error('Failed to fetch invites', e)
+    }
+}
+
+const createInvite = async () => {
+    creatingInvite.value = true
+    try {
+        await axios.post('/api/platform/invites/', {
+            expires_hours: inviteFormHours.value,
+            max_uses: inviteFormMaxUses.value,
+        })
+        showToast('邀请链接已生成')
+        fetchInvites()
+    } catch (e: any) {
+        showToast(e.response?.data?.detail || '生成失败', 'error')
+    } finally {
+        creatingInvite.value = false
+    }
+}
+
+const getInviteUrl = (token: string) => {
+    return `${window.location.origin}/register?invite=${token}`
+}
+
+const copyInviteUrl = async (token: string) => {
+    const url = getInviteUrl(token)
+    try {
+        await navigator.clipboard.writeText(url)
+        showToast('已复制到剪贴板')
+    } catch {
+        // Fallback
+        prompt('复制邀请链接:', url)
+    }
+}
+
+const revokeInvite = async (id: number) => {
+    if (!confirm('确定撤销此邀请链接？')) return
+    try {
+        await axios.delete(`/api/platform/invites/${id}/`)
+        showToast('邀请链接已撤销')
+        fetchInvites()
+    } catch (e) {
+        showToast('撤销失败', 'error')
+    }
+}
+
+// ==================== Email Config ====================
+const emailForm = ref({
+    smtp_host: '',
+    smtp_port: 587,
+    smtp_user: '',
+    smtp_password: '',
+    smtp_use_tls: true,
+    from_email: '',
+})
+const maskedSmtpPassword = ref('')
+const savingEmail = ref(false)
+
+const saveEmailConfig = async () => {
+    savingEmail.value = true
+    try {
+        const res = await axios.get('/api/platform/config/')
+        const existing = res.data || {}
+        const payload: any = {
+            smtp_host: emailForm.value.smtp_host,
+            smtp_port: emailForm.value.smtp_port,
+            smtp_user: emailForm.value.smtp_user,
+            smtp_use_tls: emailForm.value.smtp_use_tls,
+            from_email: emailForm.value.from_email,
+        }
+        if (emailForm.value.smtp_password) {
+            payload.smtp_password = emailForm.value.smtp_password
+        } else {
+            payload.smtp_password = maskedSmtpPassword.value
+        }
+        const { data } = await axios.put('/api/platform/config/', {
+            ...existing,
+            email: payload,
+        })
+        if (data.email) {
+            maskedSmtpPassword.value = data.email.smtp_password || ''
+            emailForm.value.smtp_password = ''
+        }
+        showToast('邮件配置保存成功')
+    } catch (e: any) {
+        showToast(e.response?.data?.detail || '保存失败', 'error')
+    } finally {
+        savingEmail.value = false
+    }
+}
+
 // ==================== Init ====================
 onMounted(() => {
     fetchConfig()
     fetchMembers()
+    fetchInvites()
     if (!authStore.user?.role) {
         authStore.fetchUser()
     }

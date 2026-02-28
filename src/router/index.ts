@@ -4,6 +4,7 @@ import HomeView from '../views/HomeView.vue'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import { useAuthStore } from '@/stores/auth'
+import axios from 'axios'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -115,6 +116,24 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: Register,
+      beforeEnter: async (to, from, next) => {
+        // If invite token present, allow access (validation happens in component)
+        if (to.query.invite) {
+          next()
+          return
+        }
+        // Otherwise, check registration toggle
+        try {
+          const { data } = await axios.get('/api/platform/registration-status/')
+          if (data.registration_enabled) {
+            next()
+          } else {
+            next('/login')
+          }
+        } catch {
+          next() // Allow access on API error (fail-open)
+        }
+      },
     },
     {
       path: '/about',

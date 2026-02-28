@@ -3,7 +3,7 @@
     <div class="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-2xl">
       <div>
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">工作流平台</h2>
-        <div class="mt-2 text-center">
+        <div class="mt-2 text-center" v-if="registrationEnabled">
             <span class="text-sm text-gray-600">没有账号？ </span>
             <router-link to="/register" class="font-medium text-blue-600 hover:text-blue-500 transition duration-150 ease-in-out">
                 立即注册
@@ -126,6 +126,7 @@ const authStore = useAuthStore()
 const loginMode = ref<'password' | 'qrcode'>('password')
 const qrLoading = ref(true)
 const feishuLoginEnabled = ref(false)
+const registrationEnabled = ref(true)
 const gotoUrl = ref('')
 
 declare global {
@@ -232,12 +233,17 @@ watch(loginMode, (newMode) => {
 onMounted(async () => {
   window.addEventListener('message', handleQRMessage)
   
-  // Check if Feishu login is enabled
+  // Check if Feishu login is enabled and if registration is enabled
   try {
-    const { data } = await axios.get('/api/platform/feishu-login-status/')
-    feishuLoginEnabled.value = data.login_enabled
+    const [feishuRes, regRes] = await Promise.all([
+      axios.get('/api/platform/feishu-login-status/'),
+      axios.get('/api/platform/registration-status/'),
+    ])
+    feishuLoginEnabled.value = feishuRes.data.login_enabled
+    registrationEnabled.value = regRes.data.registration_enabled
   } catch (e) {
     feishuLoginEnabled.value = false
+    registrationEnabled.value = true
   }
   
   // If starting with QR mode, initialize it
