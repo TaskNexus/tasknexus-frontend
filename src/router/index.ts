@@ -93,13 +93,11 @@ const router = createRouter({
         },
         {
           path: 'client-agents',
-          name: 'client-agents',
-          component: () => import('../views/ClientAgentListView.vue'),
+          redirect: '/platform/settings?tab=agents',
         },
         {
           path: 'client-agents/:id',
-          name: 'client-agent-detail',
-          component: () => import('../views/ClientAgentDetailView.vue'),
+          redirect: '/platform/settings?tab=agents',
         },
         {
           path: 'platform/settings',

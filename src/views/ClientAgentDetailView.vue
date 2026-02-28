@@ -1,13 +1,12 @@
 <template>
   <div class="space-y-6">
-    <!-- Header -->
+    <!-- Back + Header -->
     <div class="flex items-center gap-4">
-      <router-link to="/client-agents" class="p-2 hover:bg-gray-100 rounded-lg">
+      <button @click="emit('back')" class="p-2 hover:bg-gray-100 rounded-lg">
         <ArrowLeft class="w-5 h-5 text-gray-600" />
-      </router-link>
+      </button>
       <div class="flex-1">
-        <h1 class="text-2xl font-bold text-gray-800">{{ agent?.name || 'Agent' }}</h1>
-        <p class="text-gray-500 mt-1">配置工作空间和标签</p>
+        <div class="font-semibold text-gray-900">{{ agent?.name || 'Agent' }}</div>
       </div>
       <span 
         class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
@@ -264,7 +263,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
 import { ArrowLeft, Plus, Folder, Pencil, Trash2, X } from 'lucide-vue-next'
 import axios from 'axios'
 
@@ -290,8 +288,15 @@ interface ClientAgent {
   workspaces: AgentWorkspace[]
 }
 
-const route = useRoute()
-const agentId = route.params.id
+const props = defineProps<{
+  agentId: number | string
+}>()
+
+const emit = defineEmits<{
+  (e: 'back'): void
+}>()
+
+const agentId = props.agentId
 
 const agent = ref<ClientAgent | null>(null)
 const workspaces = ref<AgentWorkspace[]>([])

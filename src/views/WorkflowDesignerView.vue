@@ -5,7 +5,7 @@
         <!-- Top Row: Breadcrumb / Title -->
         <div class="h-10 px-4 flex items-center justify-between border-b border-gray-100">
              <div class="flex items-center text-xs text-gray-500 space-x-2">
-                 <span>Workflows</span>
+                 <span>工作流</span>
                  <span>/</span>
                  <!-- Editable Workflow Name -->
                  <input 
@@ -17,7 +17,7 @@
                  />
              </div>
              <div class="text-xs text-gray-400">
-                 {{ isSaving ? 'Saving...' : (lastSaved ? `Saved ${lastSaved}` : 'Not saved') }}
+                 {{ isSaving ? '保存中...' : (lastSaved ? `已保存 ${lastSaved}` : '未保存') }}
              </div>
         </div>
         
@@ -51,7 +51,7 @@
                   @click="isReadOnly = !isReadOnly"
                 >
                     <Edit3 class="w-4 h-4 mr-1.5" />
-                    {{ isReadOnly ? 'Read Only' : 'Editing' }}
+                    {{ isReadOnly ? '只读' : '编辑' }}
                 </button>
 
                 <div class="w-px h-4 bg-gray-300 mx-2"></div>
@@ -61,17 +61,17 @@
                   @click="handleSaveClick"
                 >
                     <Save class="w-4 h-4 mr-1.5" />
-                    Save
+                    保存
                 </button>
                 <button 
                   class="flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm text-sm transition-colors"
                   @click="handleCreateTask"
                   :disabled="!workflowId"
-                  :title="!workflowId ? 'Save workflow first' : ''"
+                  :title="!workflowId ? '先保存工作流' : ''"
                   :class="{ 'opacity-50 cursor-not-allowed': !workflowId }"
                 >
                     <Play class="w-4 h-4 mr-1.5" />
-                    Create Task
+                    创建任务
                 </button>
             </div>
         </div>
@@ -96,27 +96,27 @@
           <!-- Content: Info (Basic Info) -->
           <div v-if="activePanel === 'info'" class="flex-1 p-4 overflow-y-auto space-y-4">
               <div class="space-y-1">
-                  <label class="text-xs font-medium text-gray-500">Workflow Name</label>
+                  <label class="text-xs font-medium text-gray-500">工作流名称</label>
                   <input 
                     v-model="workflowName" 
                     class="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500"
-                    placeholder="Enter workflow name"
+                    placeholder="请输入工作流名称"
                   />
               </div>
               <div class="space-y-1">
-                  <label class="text-xs font-medium text-gray-500">Project</label>
+                  <label class="text-xs font-medium text-gray-500">项目</label>
                   <select 
                       v-model="selectedProjectId" 
                       class="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
                       :disabled="!!workflowId"
                   >
-                      <option value="" disabled>Select a project...</option>
+                      <option value="" disabled>请选择项目</option>
                       <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
                   </select>
-                  <p v-if="workflowId" class="text-xs text-gray-400 italic">Project cannot be changed for saved workflows.</p>
+                  <p v-if="workflowId" class="text-xs text-gray-400 italic">已保存的工作流无法修改项目</p>
               </div>
               <div class="space-y-1">
-                  <label class="text-xs font-medium text-gray-500">Tags</label>
+                  <label class="text-xs font-medium text-gray-500">标签</label>
                   <div class="flex flex-wrap gap-1 mb-2">
                       <span 
                         v-for="(tag, idx) in workflowTags" 
@@ -132,7 +132,7 @@
                         v-model="newTag" 
                         class="flex-1 px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
                       >
-                        <option value="" disabled>Select a tag...</option>
+                        <option value="" disabled>请选择标签</option>
                         <option v-for="tag in availableTags" :key="tag" :value="tag">
                             {{ tag }}
                         </option>
@@ -142,11 +142,11 @@
                         :disabled="!newTag"
                         class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm text-gray-600 disabled:opacity-50"
                       >
-                        Add
+                        添加
                       </button>
                   </div>
                   <div v-if="availableTags.length === 0" class="mt-1 text-xs text-orange-500">
-                      No tags configured in Project Settings.
+                      未配置标签
                   </div>
               </div>
               
@@ -169,7 +169,7 @@
           <!-- Content: Global Variables -->
           <div v-else-if="activePanel === 'vars'" class="flex-1 p-4 overflow-y-auto">
               <div v-if="!selectedProjectId" class="text-sm text-gray-400 text-center py-4">
-                  Please select a project first to see available parameters.
+                  请先选择项目以查看可用参数
               </div>
               <div v-else-if="loadingProjectParams" class="text-center py-4">
                   <Loader2 class="w-6 h-6 animate-spin mx-auto text-blue-500" />
@@ -432,33 +432,33 @@
     <!-- Save Modal -->
     <div v-if="showSaveModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showSaveModal = false">
         <div class="bg-white rounded-lg shadow-xl w-96 p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Save Workflow</h3>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">保存工作流</h3>
             <div class="space-y-4">
                 <div class="space-y-1">
-                    <label class="text-xs font-medium text-gray-500">Workflow Name</label>
+                    <label class="text-xs font-medium text-gray-500">工作流名称</label>
                     <input 
                       v-model="workflowName" 
                       class="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500"
-                      placeholder="Enter workflow name"
+                      placeholder="请输入工作流名称"
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">项目</label>
                     <select v-model="selectedProjectId" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        <option value="" disabled>Select a project</option>
+                        <option value="" disabled>请选择项目</option>
                         <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
                     </select>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
                     <button @click="showSaveModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
-                        Cancel
+                        取消
                     </button>
                     <button 
                         @click="handleSave" 
                         :disabled="isSaving || !workflowName"
                         class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
                     >
-                        {{ isSaving ? 'Saving...' : 'Save' }}
+                        {{ isSaving ? '保存中...' : '保存' }}
                     </button>
                 </div>
             </div>
@@ -490,12 +490,12 @@ const graphData = ref<any>({}) // Placeholder for JSON view
 // ... (skipping unchanged parts) ...
 
 const panelTitles: Record<string, string> = {
-    info: 'Basic Info',
-    vars: 'Global Variables',
-    json: 'Flow Data',
-    history: 'Operation History',
-    configuration: 'Node Configuration',
-    'edge-configuration': 'Edge Configuration'
+    info: '基础信息',
+    vars: '全局变量',
+    json: '流程数据',
+    history: '操作记录',
+    configuration: '节点配置',
+    'edge-configuration': '边配置'
 }
 
 // Workflow state

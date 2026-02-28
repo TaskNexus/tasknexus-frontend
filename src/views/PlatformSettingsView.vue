@@ -242,6 +242,19 @@
             </div>
           </section>
 
+          <!-- ==================== Client Agents ==================== -->
+          <section v-if="activeSection === 'agents'">
+            <ClientAgentDetailView
+              v-if="selectedAgentId"
+              :agentId="selectedAgentId"
+              @back="selectedAgentId = null"
+            />
+            <ClientAgentListView
+              v-else
+              @select-agent="(id: number) => selectedAgentId = id"
+            />
+          </section>
+
       </div>
     </div>
 
@@ -256,13 +269,16 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { Link, Shield, Users, Loader2, Info } from 'lucide-vue-next'
+import { Link, Shield, Users, Server, Loader2, Info } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import ClientAgentListView from '@/views/ClientAgentListView.vue'
+import ClientAgentDetailView from '@/views/ClientAgentDetailView.vue'
 
 // ==================== Sidebar Navigation ====================
 const route = useRoute()
-const validTabs = ['feishu', 'permissions', 'members']
+const validTabs = ['feishu', 'permissions', 'members', 'agents']
 const activeSection = ref((route.query.tab as string) && validTabs.indexOf(route.query.tab as string) >= 0 ? (route.query.tab as string) : 'feishu')
+const selectedAgentId = ref<number | null>(null)
 
 watch(() => route.query.tab, (tab) => {
   if (tab && validTabs.indexOf(tab as string) >= 0) {
@@ -274,12 +290,14 @@ const navItems = [
   { key: 'feishu', label: '飞书集成', icon: Link },
   { key: 'permissions', label: '角色与权限', icon: Shield },
   { key: 'members', label: '成员管理', icon: Users },
+  { key: 'agents', label: '客户端代理', icon: Server },
 ]
 
 const sectionMeta: Record<string, { title: string; subtitle: string }> = {
   feishu:      { title: '飞书集成',   subtitle: '配置飞书 OAuth 登录和通知' },
   permissions: { title: '角色与权限', subtitle: '管理不同角色的操作权限' },
   members:     { title: '成员管理',   subtitle: '管理平台用户及角色' },
+  agents:      { title: '客户端代理', subtitle: '管理客户端代理和工作空间' },
 }
 
 const currentSectionMeta = computed(() => sectionMeta[activeSection.value] || { title: '', subtitle: '' })

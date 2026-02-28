@@ -3,9 +3,9 @@
     <!-- Header -->
     <div class="px-6 py-4 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between">
       <div class="flex items-center space-x-2 text-sm">
-        <router-link to="/workflows" class="text-gray-500 hover:text-blue-600">Workflows</router-link>
+        <router-link to="/workflows" class="text-gray-500 hover:text-blue-600">工作流</router-link>
         <span class="text-gray-300">/</span>
-        <span class="text-gray-500">{{ workflowName || (isEditMode ? 'Edit Task' : 'New Task') }}</span>
+        <span class="text-gray-500">{{ workflowName || (isEditMode ? '编辑任务' : '新建任务') }}</span>
         <span class="text-gray-300">/</span>
         <span class="font-medium text-gray-900">{{ pageTitle }}</span>
       </div>
@@ -17,18 +17,18 @@
         
         <!-- Basic Info Module -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
+            <h2 class="text-lg font-medium text-gray-900 mb-4">基本信息</h2>
             <div class="space-y-4">
                 <!-- Workflow Selection -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Workflow</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">工作流</label>
                     <select 
                         v-model="selectedWorkflowId" 
                         @change="onWorkflowChange"
                         class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border bg-white"
                         :disabled="!!routeWorkflowId"
                     >
-                        <option value="" disabled>Select a workflow</option>
+                        <option value="" disabled>选择工作流</option>
                         <option v-for="w in workflows" :key="w.id" :value="w.id">
                             {{ w.name }}
                         </option>
@@ -40,7 +40,7 @@
 
                 <!-- Task Name -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Task Name</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">任务名称</label>
                     <div class="flex items-center gap-2">
                         <input 
                         v-model="taskName" 
@@ -60,7 +60,7 @@
 
                     <!-- Task Type -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">任务类型</label>
                     <div class="flex bg-gray-100 p-1 rounded-md">
                         <button 
                             v-for="type in taskTypes" 
@@ -77,7 +77,7 @@
                 <!-- Conditional Config: Periodic -->
                 <div v-if="selectedTaskType === 'periodic'" class="p-4 bg-blue-50 rounded border border-blue-100 space-y-3">
                     <div>
-                        <label class="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wide">Cron Expression</label>
+                        <label class="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wide">Cron 表达式</label>
                         <input 
                         v-model="cronExpression" 
                         type="text" 
@@ -117,7 +117,7 @@
 
                 <!-- Conditional Config: Scheduled -->
                 <div v-if="selectedTaskType === 'scheduled'" class="p-4 bg-purple-50 rounded border border-purple-100">
-                        <label class="block text-xs font-bold text-purple-800 mb-1 uppercase tracking-wide">Execution Time</label>
+                        <label class="block text-xs font-bold text-purple-800 mb-1 uppercase tracking-wide">执行时间</label>
                         <input 
                         v-model="planTime" 
                         type="datetime-local" 
@@ -127,12 +127,12 @@
 
                 <!-- Conditional Config: Webhook -->
                 <div v-if="selectedTaskType === 'webhook'" class="p-4 bg-green-50 rounded border border-green-100">
-                        <label class="block text-xs font-bold text-green-800 mb-1 uppercase tracking-wide">Secret (Optional)</label>
+                        <label class="block text-xs font-bold text-green-800 mb-1 uppercase tracking-wide">Webhook Secret (可选)</label>
                         <input 
                         v-model="webhookSecret" 
                         type="text" 
                         class="w-full border-green-200 rounded focus:border-green-500 focus:ring-green-500 px-3 py-2 text-sm border font-mono"
-                        placeholder="Leave empty for no secret verification"
+                        placeholder="留空则不验证"
                         />
                         <p class="text-xs text-green-600 mt-1">External systems must include this secret in X-Webhook-Secret header</p>
                 </div>
@@ -143,24 +143,24 @@
         <!-- Parameters Module -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 class="text-lg font-medium text-gray-900 mb-4 flex items-center justify-between">
-                <span>Task Parameters</span>
-                <span class="text-xs font-normal text-gray-500">Variables that will be injected into the pipeline</span>
+                <span>任务参数</span>
+                <span class="text-xs font-normal text-gray-500">变量将被注入到工作流中</span>
             </h2>
             
             <div v-if="!selectedWorkflowId" class="text-center py-8">
                     <div class="mx-auto w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mb-2">
                     <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     </div>
-                    <p class="text-sm text-gray-500">Select a workflow to configure parameters.</p>
+                    <p class="text-sm text-gray-500">选择工作流以配置参数。</p>
             </div>
 
             <div v-else-if="loadingParams" class="text-center py-8">
                     <Loader2 class="w-6 h-6 animate-spin mx-auto text-blue-500" />
-                    <p class="text-xs text-gray-500 mt-2">Loading...</p>
+                    <p class="text-xs text-gray-500 mt-2">加载中...</p>
             </div>
             
             <div v-else-if="allParams.length === 0" class="text-center py-6 bg-gray-50 rounded border border-dashed border-gray-200">
-                    <p class="text-sm text-gray-500">No configurable parameters for this workflow.</p>
+                    <p class="text-sm text-gray-500">没有可配置的参数</p>
             </div>
             
             <div v-else class="space-y-4">
@@ -197,7 +197,7 @@
         <!-- Notification Settings Module -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 class="text-lg font-medium text-gray-900 mb-4 flex items-center justify-between">
-                <span>Notification Settings</span>
+                <span>通知设置</span>
             </h2>
             
             <!-- Platform Notification -->
@@ -217,7 +217,7 @@
                                 <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
                             </div>
                             <div v-else-if="userList.length === 0" class="text-center py-3">
-                                <p class="text-sm text-gray-500">No users available</p>
+                                <p class="text-sm text-gray-500">未找到用户</p>
                             </div>
                             <div v-else>
                                 <label 
@@ -294,7 +294,7 @@
                 @click="router.back()" 
                 class="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-                Cancel
+                取消
             </button>
             <button 
                 @click="handleCreateAction" 
@@ -421,9 +421,9 @@ const selectedTaskType = ref(routeType === 'periodic' || routeType === 'schedule
 
 // Constants
 const taskTypes = [
-    { label: 'Run Once', value: 'once' },
-    { label: 'Periodic', value: 'periodic' },
-    { label: 'Scheduled', value: 'scheduled' },
+    { label: '立即执行', value: 'once' },
+    { label: '周期性', value: 'periodic' },
+    { label: '定时', value: 'scheduled' },
     { label: 'Webhook', value: 'webhook' }
 ]
 
@@ -436,12 +436,12 @@ interface ParamItem {
 }
 
 // Computed
-const pageTitle = computed(() => isEditMode.value ? 'Edit Task' : 'Create Task')
+const pageTitle = computed(() => isEditMode.value ? '编辑任务' : '创建任务')
 const submitButtonText = computed(() => {
-    if (submitting.value) return isEditMode.value ? 'Saving...' : 'Creating...'
-    if (isEditMode.value) return 'Save Changes'
-    if (selectedTaskType.value === 'once') return 'Create & Run'
-    return 'Create Task'
+    if (submitting.value) return isEditMode.value ? '保存中...' : '创建中...'
+    if (isEditMode.value) return '保存修改'
+    if (selectedTaskType.value === 'once') return '创建并运行'
+    return '创建任务'
 })
 
 const isValid = computed(() => {

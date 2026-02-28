@@ -3,15 +3,14 @@
     <!-- Header -->
     <div class="bg-white border-b border-gray-200 px-8 py-5 flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-800">Projects</h1>
-        <p class="text-sm text-gray-500 mt-1">Manage your automation projects and resources</p>
+        <h1 class="text-2xl font-bold text-gray-800">项目列表</h1>
       </div>
       <button 
         @click="showCreateModal = true"
         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-colors"
       >
         <Plus class="w-5 h-5 mr-2" />
-        New Project
+        新建项目
       </button>
     </div>
 
@@ -23,8 +22,7 @@
 
       <div v-else-if="projects.length === 0" class="text-center py-12">
         <FolderOpen class="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 class="text-lg font-medium text-gray-900">No projects found</h3>
-        <p class="text-gray-500 mt-2">Get started by creating your first project.</p>
+        <h3 class="text-lg font-medium text-gray-900">暂无项目</h3>
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

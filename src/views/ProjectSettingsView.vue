@@ -7,7 +7,7 @@
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           返回
         </button>
-        <h1 class="text-lg font-bold text-gray-800">Project Settings</h1>
+        <h1 class="text-lg font-bold text-gray-800">项目设置</h1>
         <p class="text-xs text-gray-400 mt-1 truncate">{{ form.name || 'Loading...' }}</p>
       </div>
 
@@ -79,16 +79,16 @@
           <section v-if="activeSection === 'general'">
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Project Name</label>
+                <label class="block text-sm font-medium text-gray-700">项目名称</label>
                 <input v-model="form.name" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">Description</label>
+                <label class="block text-sm font-medium text-gray-700">项目描述</label>
                 <textarea v-model="form.description" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"></textarea>
               </div>
               <div class="flex justify-end pt-4 border-t border-gray-100">
                 <button @click="saveGeneral" :disabled="saving" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                  {{ saving ? 'Saving...' : 'Save Changes' }}
+                  {{ saving ? '保存中...' : '保存更改' }}
                 </button>
               </div>
             </div>
@@ -105,7 +105,7 @@
                   @focus="showUserDropdown = true"
                   @blur="delayHideDropdown"
                   type="text"
-                  placeholder="Search by username or email..."
+                  placeholder="搜索用户名或邮箱..."
                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
                   autocomplete="off"
                 />
@@ -122,7 +122,7 @@
                 <option value="MAINTAINER">Maintainer</option>
               </select>
               <button @click="addMember" :disabled="!selectedUser || addingMember" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 h-[38px]">
-                Add
+                添加成员
               </button>
             </div>
 
@@ -131,9 +131,9 @@
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -159,7 +159,7 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button @click="removeMember(member)" class="text-red-600 hover:text-red-900" :disabled="member.role === 'OWNER'">
-                        Remove
+                        移除
                       </button>
                     </td>
                   </tr>
@@ -171,12 +171,12 @@
           <!-- ==================== AI Model Settings ==================== -->
           <section v-if="activeSection === 'ai'">
             <div class="flex items-center justify-between mb-4">
-              <p class="text-sm text-gray-500">Configure multiple AI model providers for use in workflow nodes.</p>
-              <button @click="addModelGroup" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ Add Group</button>
+              <p class="text-sm text-gray-500">配置多个 AI 模型提供商，用于工作流节点。</p>
+              <button @click="addModelGroup" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ 添加分组</button>
             </div>
 
             <div v-if="modelGroups.length === 0" class="text-center py-8 text-gray-400 text-sm">
-              No model groups configured. Click "Add Group" to create one.
+              未配置模型分组。点击“添加分组”来创建一个。
             </div>
 
             <div class="space-y-4">
@@ -186,7 +186,7 @@
                     <input type="checkbox" v-model="group.enabled" class="rounded border-gray-300 text-blue-600" />
                     <input v-model="group.title" type="text" placeholder="Group Title (e.g., Banana, OpenAI)" class="text-sm font-medium text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1" />
                   </div>
-                  <button @click="removeModelGroup(gIndex)" class="text-red-500 hover:text-red-700 text-xs">Remove</button>
+                  <button @click="removeModelGroup(gIndex)" class="text-red-500 hover:text-red-700 text-xs">移除</button>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -204,12 +204,12 @@
                 <div class="bg-gray-50 rounded p-3">
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-medium text-gray-600 uppercase">Models</span>
-                    <button @click="addModel(gIndex)" class="text-xs text-blue-600 hover:text-blue-800">+ Add Model</button>
+                    <button @click="addModel(gIndex)" class="text-xs text-blue-600 hover:text-blue-800">+ 添加模型</button>
                   </div>
-                  <div v-if="group.models.length === 0" class="text-xs text-gray-400 py-2">No models. Click "Add Model" to add one.</div>
+                  <div v-if="group.models.length === 0" class="text-xs text-gray-400 py-2">未配置模型。点击“添加模型”来添加一个。</div>
                   <div v-for="(model, mIndex) in group.models" :key="mIndex" class="flex items-center gap-2 py-1">
                     <input type="checkbox" v-model="model.enabled" class="rounded border-gray-300 text-blue-600" />
-                    <input v-model="model.name" type="text" placeholder="Model name (e.g., stable-diffusion-xl)" class="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-500" />
+                    <input v-model="model.name" type="text" placeholder="模型名称 (e.g., stable-diffusion-xl)" class="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-500" />
                     <button @click="removeModel(gIndex, mIndex)" class="text-red-400 hover:text-red-600 text-xs">×</button>
                   </div>
                 </div>
@@ -218,7 +218,7 @@
 
             <div class="flex justify-end mt-4 pt-4 border-t border-gray-100">
               <button @click="saveAiConfig" :disabled="savingAiConfig" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {{ savingAiConfig ? 'Saving...' : 'Save AI Settings' }}
+                {{ savingAiConfig ? '保存中...' : '保存设置' }}
               </button>
             </div>
           </section>
@@ -226,12 +226,12 @@
           <!-- ==================== MCP Services ==================== -->
           <section v-if="activeSection === 'mcp'">
             <div class="flex items-center justify-between mb-4">
-              <p class="text-sm text-gray-500">Configure MCP (Model Context Protocol) servers to extend AI capabilities.</p>
-              <button @click="addMCPServer" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ Add Server</button>
+              <p class="text-sm text-gray-500">配置 MCP (Model Context Protocol) 服务器以扩展 AI 功能。</p>
+              <button @click="addMCPServer" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ 添加服务器</button>
             </div>
 
             <div v-if="mcpServers.length === 0" class="text-center py-8 text-gray-400 text-sm">
-              No MCP servers configured. Click "Add Server" to add one.
+              未配置 MCP 服务器。点击“添加服务器”来添加一个。
             </div>
 
             <div class="space-y-4">
@@ -248,9 +248,9 @@
                   </div>
                   <div class="flex items-center gap-2">
                     <button @click="testMCPServer(sIndex)" :disabled="srv.testing" class="text-xs text-blue-600 hover:text-blue-800 border border-blue-300 rounded px-2 py-1 disabled:opacity-50">
-                      {{ srv.testing ? 'Testing...' : 'Test Connection' }}
+                      {{ srv.testing ? '连接中...' : '测试连接' }}
                     </button>
-                    <button @click="removeMCPServer(sIndex)" class="text-red-500 hover:text-red-700 text-xs">Remove</button>
+                    <button @click="removeMCPServer(sIndex)" class="text-red-500 hover:text-red-700 text-xs">移除</button>
                   </div>
                 </div>
 
@@ -286,7 +286,7 @@
 
             <div class="flex justify-end mt-4 pt-4 border-t border-gray-100">
               <button @click="saveMCPConfig" :disabled="savingMCP" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {{ savingMCP ? 'Saving...' : 'Save MCP Settings' }}
+                {{ savingMCP ? '保存中...' : '保存设置' }}
               </button>
             </div>
           </section>
@@ -294,8 +294,8 @@
           <!-- ==================== Global Parameters ==================== -->
           <section v-if="activeSection === 'params'">
             <div class="flex items-center justify-between mb-4">
-              <p class="text-sm text-gray-500">Define global parameters accessible to all workflows. <code>project_id</code> is always available.</p>
-              <button @click="addGlobalParam" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ Add Parameter</button>
+              <p class="text-sm text-gray-500">定义全局参数，所有工作流均可使用。<code>project_id</code> 始终可用。</p>
+              <button @click="addGlobalParam" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ 添加参数</button>
             </div>
 
             <div class="space-y-3">
@@ -317,7 +317,7 @@
               </div>
 
               <div v-if="globalParams.length === 0" class="text-center py-4 text-gray-400 text-sm">
-                No custom parameters defined. Click "Add Parameter" to create one.
+                暂无自定义参数。点击“添加参数”创建
               </div>
 
               <div v-for="(param, index) in globalParams" :key="index" class="flex items-start gap-3 p-3 rounded border border-gray-100 hover:border-gray-300 transition-colors">
@@ -343,7 +343,7 @@
 
             <div class="flex justify-end mt-6 pt-4 border-t border-gray-100">
               <button @click="saveGlobalParams" :disabled="savingGlobalParams" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {{ savingGlobalParams ? 'Saving...' : 'Save Parameters' }}
+                {{ savingGlobalParams ? '保存中...' : '保存设置' }}
               </button>
             </div>
           </section>
@@ -351,18 +351,18 @@
           <!-- ==================== Workflow Tags ==================== -->
           <section v-if="activeSection === 'tags'">
             <div class="flex items-center justify-between mb-4">
-              <p class="text-sm text-gray-500">Define standard tags for workflows in this project.</p>
-              <button @click="addWorkflowTag" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ Add Tag</button>
+              <p class="text-sm text-gray-500">定义工作流的标签。</p>
+              <button @click="addWorkflowTag" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ 添加标签</button>
             </div>
 
             <div v-if="workflowTags.length === 0" class="text-center py-4 text-gray-400 text-sm">
-              No tags defined. Click "Add Tag" to create one.
+              暂无标签。点击“添加标签”创建一个。
             </div>
 
             <div v-else class="space-y-3">
               <div v-for="(tag, index) in workflowTags" :key="index" class="flex items-center gap-3 p-3 rounded border border-gray-100 hover:border-gray-300 transition-colors">
                 <div class="flex-1">
-                  <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Tag Name</label>
+                  <label class="block text-xs font-medium text-gray-500 uppercase mb-1">标签名称</label>
                   <input v-model="workflowTags[index]" type="text" placeholder="e.g. Backend" class="w-full text-sm border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none" />
                 </div>
                 <div class="w-8 flex items-center justify-center pt-6">
@@ -375,35 +375,35 @@
 
             <div class="flex justify-end mt-6 pt-4 border-t border-gray-100">
               <button @click="saveWorkflowTags" :disabled="savingWorkflowTags" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {{ savingWorkflowTags ? 'Saving...' : 'Save Tags' }}
+                {{ savingWorkflowTags ? '保存中...' : '保存设置' }}
               </button>
             </div>
           </section>
 
           <!-- ==================== Client Agent ==================== -->
           <section v-if="activeSection === 'agent'">
-            <p class="text-sm text-gray-500 mb-4">Configure git repository for client agent code. The branch here is the default; individual nodes can override it.</p>
+            <p class="text-sm text-gray-500 mb-4">配置客户端代理代码的 git 仓库。这里的分支是默认分支；单个节点可以覆盖</p>
 
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Repository URL</label>
+                <label class="block text-sm font-medium text-gray-700">仓库地址</label>
                 <input v-model="agentRepoUrl" type="text" placeholder="https://github.com/user/repo.git" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">Repository Token</label>
+                <label class="block text-sm font-medium text-gray-700">仓库 Token</label>
                 <input v-model="agentRepoToken" type="password" placeholder="ghp_... or glpat-..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
-                <p class="mt-1 text-xs text-gray-400">Used for authenticating git clone/pull operations on the client agent.</p>
+                <p class="mt-1 text-xs text-gray-400">用于认证客户端代理上的操作。</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">Default Branch</label>
+                <label class="block text-sm font-medium text-gray-700">默认分支</label>
                 <input v-model="agentRepoRef" type="text" placeholder="main" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
-                <p class="mt-1 text-xs text-gray-400">Default branch/ref. Can be overridden per workflow node.</p>
+                <p class="mt-1 text-xs text-gray-400">默认分支/引用。可以被工作流节点覆盖。</p>
               </div>
             </div>
 
             <div class="flex justify-end mt-6 pt-4 border-t border-gray-100">
               <button @click="saveAgentConfig" :disabled="savingAgentConfig" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {{ savingAgentConfig ? 'Saving...' : 'Save Agent Settings' }}
+                {{ savingAgentConfig ? '保存中...' : '保存设置' }}
               </button>
             </div>
           </section>
@@ -439,7 +439,7 @@ const navGroups: Record<string, NavItem[]> = {
   integration: [
     { key: 'ai', label: 'AI 模型', icon: Bot },
     { key: 'mcp', label: 'MCP 服务', icon: Plug },
-    { key: 'agent', label: 'Client Agent', icon: Monitor },
+    { key: 'agent', label: '客户端代理仓库', icon: Monitor },
   ],
   advanced: [
     { key: 'params', label: '全局参数', icon: Globe },
@@ -454,7 +454,7 @@ const sectionMeta: Record<string, { title: string; subtitle: string }> = {
   mcp:      { title: 'MCP 服务',     subtitle: '管理 MCP 服务器连接' },
   params:   { title: '全局参数',     subtitle: '定义全局变量供工作流使用' },
   tags:     { title: '工作流标签',   subtitle: '定义标准标签分类工作流' },
-  agent:    { title: 'Client Agent', subtitle: '配置客户端代理的仓库' },
+  agent:    { title: '客户端代理仓库', subtitle: '配置客户端代理的仓库' },
 }
 
 const currentSectionMeta = computed(() => sectionMeta[activeSection.value] || { title: '', subtitle: '' })

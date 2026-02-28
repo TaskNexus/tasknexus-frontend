@@ -81,11 +81,11 @@
                     <thead class="bg-gray-50 border-b border-gray-100 text-gray-500 uppercase text-xs">
                         <tr>
                             <th class="px-6 py-4 font-semibold">ID</th>
-                            <th class="px-6 py-4 font-semibold">Task Name</th>
-                            <th class="px-6 py-4 font-semibold">Workflow</th>
-                            <th class="px-6 py-4 font-semibold">Status</th>
-                            <th class="px-6 py-4 font-semibold whitespace-nowrap">Start Time</th>
-                            <th class="px-6 py-4 font-semibold whitespace-nowrap">End Time</th>
+                            <th class="px-6 py-4 font-semibold">任务名称</th>
+                            <th class="px-6 py-4 font-semibold">工作流</th>
+                            <th class="px-6 py-4 font-semibold">状态</th>
+                            <th class="px-6 py-4 font-semibold whitespace-nowrap">开始时间</th>
+                            <th class="px-6 py-4 font-semibold whitespace-nowrap">结束时间</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">

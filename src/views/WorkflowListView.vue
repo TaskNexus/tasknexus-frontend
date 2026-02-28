@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
       <h1 class="text-xl font-semibold text-gray-800">
-          Workflows
+          工作流列表
       </h1>
       <div class="flex items-center space-x-2">
          <select 
@@ -11,9 +11,9 @@
             @change="handleProjectChange"
             class="border border-gray-200 rounded text-sm text-gray-600 h-9 pl-2 pr-8 focus:outline-none focus:border-blue-500 bg-white"
         >
-           <option :value="''">All Projects</option>
+           <option :value="''">所有项目</option>
            <option v-for="p in projects" :key="p.id" :value="p.id">
-             [{{ p.id }}] {{ p.name }}
+             {{ p.name }}
            </option>
         </select>
       </div>
@@ -110,16 +110,6 @@
             </tbody>
         </table>
     </div>
-
-
-    <!-- Create Task Modal -->
-    <!-- Create Task Modal - Removed -->
-    <!-- <CreateTaskModal 
-        :isOpen="showCreateTaskModal" 
-        :workflowId="createTaskWorkflowId"
-        @close="showCreateTaskModal = false"
-        @created="(taskId) => router.push(`/tasks/${taskId}`)"
-    /> -->
   </div>
 </template>
 

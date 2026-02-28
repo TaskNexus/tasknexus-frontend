@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
       <h1 class="text-xl font-semibold text-gray-800">
-          Tasks
+          任务列表
       </h1>
       <div class="flex items-center space-x-2">
          <select 
@@ -11,9 +11,9 @@
             @change="handleProjectChange"
             class="border border-gray-200 rounded text-sm text-gray-600 h-9 pl-2 pr-8 focus:outline-none focus:border-blue-500 bg-white"
         >
-           <option :value="''">All Projects</option>
+           <option :value="''">项目</option>
            <option v-for="p in projects" :key="p.id" :value="p.id">
-             [{{ p.id }}] {{ p.name }}
+             {{ p.name }}
            </option>
         </select>
         
@@ -22,7 +22,7 @@
             @change="fetchTasks"
             class="border border-gray-200 rounded text-sm text-gray-600 h-9 pl-2 pr-8 focus:outline-none focus:border-blue-500 bg-white"
         >
-           <option :value="''">All Status</option>
+           <option :value="''">状态</option>
            <option value="CREATED">Created</option>
            <option value="RUNNING">Running</option>
            <option value="PAUSED">Paused</option>
@@ -38,18 +38,18 @@
       <div class="flex items-center justify-between">
           <div class="flex items-center space-x-4">
             <div class="flex items-center">
-                <span class="text-sm text-gray-500 mr-2 w-16 text-right">Task Name:</span>
+                <span class="text-sm text-gray-500 mr-2 w-16 text-right">任务名称:</span>
                 <input 
                     v-model="searchName"
                     @keyup.enter="fetchTasks"
                     type="text" 
-                    placeholder="Search by name" 
+                    placeholder="搜索任务名称" 
                     class="border border-gray-200 rounded px-2 py-1 text-sm w-40 focus:outline-none focus:border-blue-500"
                 >
             </div>
              <div class="flex items-center ml-4">
-                 <button class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" @click="fetchTasks">Filter</button>
-                 <button class="bg-white border border-gray-200 text-gray-600 px-4 py-1.5 rounded text-sm ml-2 hover:bg-gray-50" @click="resetFilters">Reset</button>
+                 <button class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" @click="fetchTasks">过滤</button>
+                 <button class="bg-white border border-gray-200 text-gray-600 px-4 py-1.5 rounded text-sm ml-2 hover:bg-gray-50" @click="resetFilters">重置</button>
             </div>
           </div>
           
@@ -59,7 +59,7 @@
                 class="bg-red-50 text-red-600 border border-red-200 px-4 py-1.5 rounded text-sm hover:bg-red-100 transition-colors"
                 @click="batchDelete"
               >
-                  Batch Delete ({{ selectedTasks.length }})
+                  批量删除 ({{ selectedTasks.length }})
               </button>
           </div>
       </div>
@@ -80,18 +80,18 @@
                         >
                     </th>
                     <th class="py-3 font-medium w-16">ID</th>
-                    <th class="py-3 font-medium">Task Name</th>
-                    <th class="py-3 font-medium">Workflow</th>
-                    <th class="py-3 font-medium">Project</th>
-                    <th class="py-3 font-medium text-center">Status</th>
-                    <th class="py-3 font-medium">Started At</th>
-                    <th class="py-3 font-medium">Finished At</th>
+                    <th class="py-3 font-medium">任务名称</th>
+                    <th class="py-3 font-medium">工作流</th>
+                    <th class="py-3 font-medium">项目</th>
+                    <th class="py-3 font-medium text-center">状态</th>
+                    <th class="py-3 font-medium">开始时间</th>
+                    <th class="py-3 font-medium">结束时间</th>
                     <th class="py-3 font-medium w-32 text-center">Action</th>
                 </tr>
             </thead>
             <tbody class="text-sm text-gray-700">
                 <tr v-if="tasks.length === 0" class="border-b border-gray-50">
-                    <td colspan="9" class="py-8 text-center text-gray-400">No tasks found</td>
+                    <td colspan="9" class="py-8 text-center text-gray-400">暂无任务</td>
                 </tr>
                 <tr v-for="task in tasks" :key="task.id" class="border-b border-gray-50 hover:bg-blue-50/30 transition-colors group">
                      <td class="py-3 text-center">
@@ -102,7 +102,7 @@
                             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                          >
                      </td>
-                     <td class="py-3 text-gray-500">#{{ task.id }}</td>
+                     <td class="py-3 text-gray-500">{{ task.id }}</td>
                      <td class="py-3 font-medium text-gray-800">{{ task.name }}</td>
                      <td class="py-3 text-blue-600 cursor-pointer hover:underline" @click="goToWorkflow(task.workflow)">
                          {{ task.workflow_name || 'Unknown' }}
@@ -116,9 +116,9 @@
                      <td class="py-3 text-gray-500">{{ formatDate(task.started_at) }}</td>
                      <td class="py-3 text-gray-500">{{ formatDate(task.finished_at) }}</td>
                      <td class="py-3 text-center space-x-2">
-                         <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="viewDetail(task.id)">Detail</button>
-                         <button class="text-green-600 hover:text-green-800 text-xs font-medium" @click="replayTask(task)">Replay</button>
-                         <button class="text-red-500 hover:text-red-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity" @click="deleteTask(task.id)">Delete</button>
+                         <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="viewDetail(task.id)">详情</button>
+                         <button class="text-green-600 hover:text-green-800 text-xs font-medium" @click="replayTask(task)">回放</button>
+                         <button class="text-red-500 hover:text-red-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity" @click="deleteTask(task.id)">删除</button>
                      </td>
                 </tr>
             </tbody>

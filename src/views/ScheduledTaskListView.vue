@@ -3,12 +3,12 @@
     <!-- Header -->
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
       <h1 class="text-xl font-semibold text-gray-800">
-          Scheduled Tasks
+          计划任务
       </h1>
       <div class="flex items-center space-x-2">
          <button class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 flex items-center" @click="openCreate">
             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            New Task
+            新建计划任务
          </button>
       </div>
     </div>
@@ -19,21 +19,21 @@
             <thead>
                 <tr class="border-b border-gray-100 text-xs text-gray-500">
                     <th class="py-3 font-medium w-16">ID</th>
-                    <th class="py-3 font-medium">Task Name</th>
-                    <th class="py-3 font-medium">Workflow Template</th>
-                    <th class="py-3 font-medium">Status</th>
-                    <th class="py-3 font-medium">Execution Time</th>
-                    <th class="py-3 font-medium">Creator</th>
-                    <th class="py-3 font-medium">Created At</th>
-                    <th class="py-3 font-medium text-right w-48">Operations</th>
+                    <th class="py-3 font-medium">任务名称</th>
+                    <th class="py-3 font-medium">工作流</th>
+                    <th class="py-3 font-medium">状态</th>
+                    <th class="py-3 font-medium">执行时间</th>
+                    <th class="py-3 font-medium">创建者</th>
+                    <th class="py-3 font-medium">创建时间</th>
+                    <th class="py-3 font-medium text-right w-48">操作</th>
                 </tr>
             </thead>
             <tbody class="text-sm text-gray-700">
                 <tr v-if="tasks.length === 0" class="border-b border-gray-50">
                     <td colspan="8" class="py-12 text-center text-gray-400">
                         <div class="flex flex-col items-center">
-                            <span class="mb-2">No scheduled tasks found</span>
-                            <button class="text-blue-600 hover:underline text-xs" @click="openCreate">Create one</button>
+                            <span class="mb-2">暂无计划任务</span>
+                            <button class="text-blue-600 hover:underline text-xs" @click="openCreate">创建计划任务</button>
                         </div>
                     </td>
                 </tr>
@@ -54,9 +54,9 @@
                      <td class="py-3 text-gray-500">{{ task.creator_username || '-' }}</td>
                      <td class="py-3 text-gray-500">{{ formatDate(task.created_at) }}</td>
                      <td class="py-3 text-right space-x-3">
-                         <button v-if="task.status === 'EXECUTED'" class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="viewHistory(task.id)">History</button>
-                         <button v-if="task.status === 'PENDING'" class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="handleEdit(task)">Edit</button>
-                         <button class="text-red-500 hover:text-red-700 text-xs font-medium" @click="deleteTask(task.id)">Delete</button>
+                         <button v-if="task.status === 'EXECUTED'" class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="viewHistory(task.id)">历史</button>
+                         <button v-if="task.status === 'PENDING'" class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="handleEdit(task)">编辑</button>
+                         <button class="text-red-500 hover:text-red-700 text-xs font-medium" @click="deleteTask(task.id)">删除</button>
                      </td>
                 </tr>
             </tbody>

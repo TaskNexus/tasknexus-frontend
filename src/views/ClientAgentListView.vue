@@ -1,19 +1,5 @@
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex justify-between items-center">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-800">{{ t('clientAgents.title') }}</h1>
-        <p class="text-gray-500 mt-1">{{ t('clientAgents.description') }}</p>
-      </div>
-      <button
-        @click="showCreateDialog = true"
-        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-      >
-        <Plus class="w-4 h-4" />
-        {{ t('clientAgents.create') }}
-      </button>
-    </div>
 
     <!-- Agent List -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -43,7 +29,7 @@
         <tbody class="divide-y divide-gray-100">
           <tr v-for="agent in agents" :key="agent.id" class="hover:bg-gray-50 transition-colors">
             <td class="px-6 py-4">
-              <router-link :to="`/client-agents/${agent.id}`" class="flex items-center gap-3 hover:text-blue-600">
+              <a href="#" @click.prevent="emit('select-agent', agent.id)" class="flex items-center gap-3 hover:text-blue-600">
                 <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
                   <Monitor class="w-5 h-5 text-white" />
                 </div>
@@ -51,7 +37,7 @@
                   <div class="font-medium text-gray-900">{{ agent.name }}</div>
                   <div class="text-sm text-gray-500">{{ agent.hostname || '-' }}</div>
                 </div>
-              </router-link>
+              </a>
             </td>
             <td class="px-6 py-4">
               <span 
@@ -75,13 +61,13 @@
             </td>
             <td class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-2">
-                <router-link
-                  :to="`/client-agents/${agent.id}`"
+                <button
+                  @click="emit('select-agent', agent.id)"
                   class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   :title="'配置工作空间'"
                 >
                   <Settings class="w-4 h-4" />
-                </router-link>
+                </button>
                 <button
                   @click="openEditDialog(agent)"
                   class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -112,21 +98,21 @@
 
     <!-- Start Command Info -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-      <h3 class="font-medium text-blue-900 mb-2">启动 Agent</h3>
+      <h3 class="font-medium text-blue-900 mb-2">启动客户端代理</h3>
       <div class="bg-gray-900 rounded-lg p-4">
         <code class="text-sm text-green-400 break-all">
-          tasknexus-client-agent --server {{ wsServerUrl }} --name &lt;agent-name&gt;
+          tasknexus-client-agent --config config.yaml
         </code>
       </div>
-      <p class="text-sm text-blue-700 mt-2">Agent 会根据名称自动注册或连接到已存在的 Agent。</p>
+      <p class="text-sm text-blue-700 mt-2">会根据名称自动注册或连接到已存在的客户端代理</p>
     </div>
 
     <!-- Create/Edit Dialog -->
-    <div v-if="showCreateDialog || showEditDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div v-if="showEditDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
         <div class="px-6 py-4 border-b border-gray-100">
           <h3 class="text-lg font-semibold text-gray-900">
-            {{ showEditDialog ? t('clientAgents.edit') : t('clientAgents.create') }}
+            {{ t('clientAgents.edit') }}
           </h3>
         </div>
         <div class="p-6 space-y-4">
@@ -198,7 +184,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Plus, Monitor, Pencil, Trash2, Settings } from 'lucide-vue-next'
+import { Monitor, Pencil, Trash2, Settings } from 'lucide-vue-next'
 import axios from 'axios'
 
 interface AgentWorkspace {
@@ -222,10 +208,13 @@ interface ClientAgent {
   workspaces: AgentWorkspace[]
 }
 
+const emit = defineEmits<{
+  (e: 'select-agent', id: number): void
+}>()
+
 const { t } = useI18n()
 
 const agents = ref<ClientAgent[]>([])
-const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
 const editingAgentId = ref<number | null>(null)
 
@@ -284,7 +273,6 @@ const openEditDialog = (agent: ClientAgent) => {
 }
 
 const closeDialog = () => {
-  showCreateDialog.value = false
   showEditDialog.value = false
   editingAgentId.value = null
   form.name = ''
@@ -293,10 +281,8 @@ const closeDialog = () => {
 
 const saveAgent = async () => {
   try {
-    if (showEditDialog.value && editingAgentId.value) {
+    if (editingAgentId.value) {
       await axios.patch(`/api/client-agents/agents/${editingAgentId.value}/`, form)
-    } else {
-      await axios.post('/api/client-agents/agents/', form)
     }
     closeDialog()
     fetchAgents()

@@ -131,7 +131,6 @@ import {
   ChevronDown,
   Users,
   MessageSquare,
-  Server,
   Settings,
 } from 'lucide-vue-next'
 
@@ -172,7 +171,6 @@ const navItems = computed(() => {
           { name: t('nav.webhookTasks'), to: '/tasks/webhook', routeName: 'tasks-webhook' },
       ]
   },
-  { name: t('nav.clientAgents'), to: '/client-agents', routeName: 'client-agents', icon: Server },
   ]
   // Maintainer+ only: Platform Settings (includes permissions matrix)
   const role = authStore.user?.platform_role || authStore.user?.role

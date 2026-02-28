@@ -3,12 +3,12 @@
     <!-- Header -->
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
       <h1 class="text-xl font-semibold text-gray-800">
-          Webhook Tasks
+          Webhook 任务
       </h1>
       <div class="flex items-center space-x-2">
          <button class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 flex items-center" @click="openCreate">
             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            New Task
+            新建任务
          </button>
       </div>
     </div>
@@ -19,21 +19,21 @@
             <thead>
                 <tr class="border-b border-gray-100 text-xs text-gray-500">
                     <th class="py-3 font-medium w-16">ID</th>
-                    <th class="py-3 font-medium">Task Name</th>
-                    <th class="py-3 font-medium">Workflow</th>
+                    <th class="py-3 font-medium">任务名称</th>
+                    <th class="py-3 font-medium">工作流</th>
                     <th class="py-3 font-medium">Webhook URL</th>
-                    <th class="py-3 font-medium">Last Run</th>
-                    <th class="py-3 font-medium text-center">Run Count</th>
-                    <th class="py-3 font-medium text-center">Enabled</th>
-                    <th class="py-3 font-medium text-right w-56">Operations</th>
+                    <th class="py-3 font-medium">最后运行</th>
+                    <th class="py-3 font-medium text-center">运行次数</th>
+                    <th class="py-3 font-medium text-center">启用</th>
+                    <th class="py-3 font-medium text-right w-56">操作</th>
                 </tr>
             </thead>
             <tbody class="text-sm text-gray-700">
                 <tr v-if="tasks.length === 0" class="border-b border-gray-50">
                     <td colspan="8" class="py-12 text-center text-gray-400">
                         <div class="flex flex-col items-center">
-                            <span class="mb-2">No webhook tasks found</span>
-                            <button class="text-blue-600 hover:underline text-xs" @click="openCreate">Create one</button>
+                            <span class="mb-2">未找到 Webhook 任务</span>
+                            <button class="text-blue-600 hover:underline text-xs" @click="openCreate">新建任务</button>
                         </div>
                     </td>
                 </tr>
