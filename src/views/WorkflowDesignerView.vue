@@ -175,7 +175,7 @@
                   <Loader2 class="w-6 h-6 animate-spin mx-auto text-blue-500" />
               </div>
               <div v-else-if="projectParams.length === 0" class="text-sm text-gray-400 text-center py-4">
-                  No global parameters defined in this project.
+                  暂未定义项目的全局变量
               </div>
               <div v-else class="space-y-4">
                   <p class="text-xs text-gray-500 mb-2">Enable parameters to inject into this workflow.</p>
@@ -266,7 +266,7 @@
               <!-- Workflow Specific Params -->
               <div>
                   <div class="flex items-center justify-between mb-2">
-                      <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Workflow Parameters</h4>
+                      <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">流程变量</h4>
                       <button @click="addWorkflowParam" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded transition-colors">
                           + Add
                       </button>
