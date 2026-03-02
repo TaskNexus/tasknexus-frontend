@@ -42,6 +42,25 @@
       <!-- Content -->
       <div class="flex-1 overflow-y-auto px-8 py-6">
 
+          <!-- ==================== General Settings ==================== -->
+          <section v-if="activeSection === 'general'">
+            <p class="text-sm text-gray-500 mb-4">配置平台的基础站点信息，如后端 API 的外部可访问地址。</p>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">后端站点地址 (Site URL)</label>
+                <input v-model="siteForm.site_url" type="text" placeholder="http://192.168.3.40:8000 或 https://api.example.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2" />
+                <p class="mt-1 text-xs text-gray-400">后端 API 服务的外部可访问地址（局域网 IP 或域名），用于生成 Webhook URL 等外部链接。无需末尾斜杠。</p>
+              </div>
+            </div>
+
+            <div class="flex justify-end pt-4 mt-4 border-t border-gray-100">
+              <button @click="saveSiteConfig" :disabled="savingSite" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {{ savingSite ? '保存中...' : '保存通用设置' }}
+              </button>
+            </div>
+          </section>
+
           <!-- ==================== Feishu Integration ==================== -->
           <section v-if="activeSection === 'feishu'">
             <p class="text-sm text-gray-500 mb-4">配置飞书应用凭证，用于 OAuth 登录、通知推送和用户列表获取。</p>
@@ -401,15 +420,15 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { Link, Shield, Users, Server, Loader2, Info, UserPlus, Mail } from 'lucide-vue-next'
+import { Link, Shield, Users, Server, Loader2, Info, UserPlus, Mail, Globe } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import ClientAgentListView from '@/views/ClientAgentListView.vue'
 import ClientAgentDetailView from '@/views/ClientAgentDetailView.vue'
 
 // ==================== Sidebar Navigation ====================
 const route = useRoute()
-const validTabs = ['feishu', 'permissions', 'members', 'registration', 'email', 'agents']
-const activeSection = ref((route.query.tab as string) && validTabs.indexOf(route.query.tab as string) >= 0 ? (route.query.tab as string) : 'feishu')
+const validTabs = ['general', 'feishu', 'permissions', 'members', 'registration', 'email', 'agents']
+const activeSection = ref((route.query.tab as string) && validTabs.indexOf(route.query.tab as string) >= 0 ? (route.query.tab as string) : 'general')
 const selectedAgentId = ref<number | null>(null)
 
 watch(() => route.query.tab, (tab) => {
@@ -419,6 +438,7 @@ watch(() => route.query.tab, (tab) => {
 })
 
 const navItems = [
+  { key: 'general', label: '通用设置', icon: Globe },
   { key: 'feishu', label: '飞书集成', icon: Link },
   { key: 'permissions', label: '角色与权限', icon: Shield },
   { key: 'members', label: '成员管理', icon: Users },
@@ -428,6 +448,7 @@ const navItems = [
 ]
 
 const sectionMeta: Record<string, { title: string; subtitle: string }> = {
+  general:       { title: '通用设置',   subtitle: '配置平台基础站点信息' },
   feishu:        { title: '飞书集成',   subtitle: '配置飞书 OAuth 登录和通知' },
   permissions:   { title: '角色与权限', subtitle: '管理不同角色的操作权限' },
   members:       { title: '成员管理',   subtitle: '管理平台用户及角色' },
@@ -445,6 +466,31 @@ const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setTimeout(() => { toast.value.show = false }, 3000)
 }
 
+// ==================== Site Config ====================
+const siteForm = ref({
+    site_url: '',
+})
+const savingSite = ref(false)
+
+const saveSiteConfig = async () => {
+    savingSite.value = true
+    try {
+        const res = await axios.get('/api/platform/config/')
+        const existing = res.data || {}
+        await axios.put('/api/platform/config/', {
+            ...existing,
+            site: {
+                site_url: siteForm.value.site_url.replace(/\/+$/, ''),
+            }
+        })
+        showToast('通用设置保存成功')
+    } catch (e: any) {
+        showToast(e.response?.data?.detail || '保存失败', 'error')
+    } finally {
+        savingSite.value = false
+    }
+}
+
 // ==================== Feishu Config ====================
 const feishuForm = ref({
     app_id: '',
@@ -458,6 +504,10 @@ const savingFeishu = ref(false)
 const fetchConfig = async () => {
     try {
         const { data } = await axios.get('/api/platform/config/')
+        // Load site config
+        if (data.site) {
+            siteForm.value.site_url = data.site.site_url || ''
+        }
         if (data.feishu) {
             feishuForm.value.app_id = data.feishu.app_id || ''
             feishuForm.value.redirect_uri = data.feishu.redirect_uri || ''

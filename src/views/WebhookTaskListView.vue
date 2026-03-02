@@ -72,10 +72,10 @@
                         </button>
                      </td>
                      <td class="py-3 text-right space-x-3">
-                         <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="viewHistory(task.id)">History</button>
-                         <button class="text-orange-500 hover:text-orange-700 text-xs font-medium" @click="regenerateToken(task)">Regenerate</button>
-                         <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="handleEdit(task)">Edit</button>
-                         <button class="text-red-500 hover:text-red-700 text-xs font-medium" @click="deleteTask(task.id)">Delete</button>
+                         <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="viewHistory(task.id)">历史</button>
+                         <button class="text-orange-500 hover:text-orange-700 text-xs font-medium" @click="regenerateToken(task)">刷新 Token</button>
+                         <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="handleEdit(task)">编辑</button>
+                         <button class="text-red-500 hover:text-red-700 text-xs font-medium" @click="deleteTask(task.id)">删除</button>
                      </td>
                 </tr>
             </tbody>
@@ -145,10 +145,23 @@ const regenerateToken = async (task: any) => {
 
 const copyUrl = async (url: string) => {
     try {
-        await navigator.clipboard.writeText(url)
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(url)
+        } else {
+            // Fallback for non-HTTPS contexts (e.g. LAN HTTP)
+            const textArea = document.createElement('textarea')
+            textArea.value = url
+            textArea.style.position = 'fixed'
+            textArea.style.left = '-9999px'
+            document.body.appendChild(textArea)
+            textArea.select()
+            document.execCommand('copy')
+            document.body.removeChild(textArea)
+        }
         showNotification("URL copied to clipboard")
     } catch (e) {
         console.error("Failed to copy URL", e)
+        prompt("复制 Webhook URL:", url)
     }
 }
 
