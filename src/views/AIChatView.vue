@@ -28,7 +28,12 @@
           <div class="flex-1 truncate text-sm font-medium">
             {{ session.title }}
           </div>
+          <span v-if="session.source === 'pipeline'"
+            class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+            Pipeline
+          </span>
           <button 
+            v-if="session.source !== 'pipeline'"
             @click.stop="deleteSession(session.id)"
             class="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 rounded"
           >
@@ -204,7 +209,8 @@
             rows="1"
             class="w-full bg-transparent text-gray-900 placeholder-gray-400 px-4 py-4 pr-12 rounded-xl focus:outline-none resize-none overflow-hidden"
             style="min-height: 56px; max-height: 200px;"
-            placeholder="输入消息... (Shift+Enter换行)"
+            :placeholder="isReadOnly ? '此会话为 Pipeline 只读会话' : '输入消息... (Shift+Enter换行)'"
+            :disabled="isReadOnly"
             ref="inputRef"
             @input="adjustHeight"
           ></textarea>
@@ -212,7 +218,7 @@
           <div class="absolute right-2 bottom-2 flex items-center gap-2">
             <button 
               @click="sendMessage"
-              :disabled="!inputMessage.trim() || loading || !selectedProjectId || !selectedModelGroup"
+              :disabled="!inputMessage.trim() || loading || !selectedProjectId || !selectedModelGroup || isReadOnly"
               class="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <ArrowUp class="w-5 h-5" />
@@ -345,6 +351,12 @@ const inputMessage = ref('')
 const loading = ref(false)
 const chatContainer = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
+
+const isReadOnly = computed(() => {
+    if (!currentSessionId.value) return false
+    const session = sessions.value.find(s => s.id === currentSessionId.value)
+    return session?.source === 'pipeline'
+})
 
 // Methods
 const renderMarkdown = (content: string) => {
