@@ -154,10 +154,10 @@
               <!-- Message Bubble -->
               <div 
                 class="max-w-[85%] rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden"
-                :class="msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none px-5 py-3.5' : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'"
+                :class="msg.role === 'user' ? 'user-message-bubble rounded-br-none px-5 py-3.5' : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'"
               >
                   <div v-if="msg.role === 'user'">
-                      <div class="markdown-content" v-html="renderMarkdown(msg.content)"></div>
+                      <div class="markdown-content user-markdown" v-html="renderMarkdown(msg.content)"></div>
                   </div>
                   <div v-else class="flex flex-col">
                       <!-- Thinking Block -->
@@ -180,8 +180,8 @@
               </div>
 
               <!-- Avatar for User -->
-              <div v-if="msg.role === 'user'" class="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
-                <User class="w-5 h-5 text-blue-600" />
+              <div v-if="msg.role === 'user'" class="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
+                <User class="w-5 h-5 text-indigo-500" />
               </div>
             </div>
           </div>
@@ -202,24 +202,22 @@
 
       <!-- Input Area -->
       <div class="flex-none p-6 bg-white border-t border-gray-200">
-        <div class="max-w-4xl mx-auto relative bg-gray-50 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all shadow-sm">
-          <textarea 
-            v-model="inputMessage"
-            @keydown.enter.prevent="sendMessage"
-            rows="1"
-            class="w-full bg-transparent text-gray-900 placeholder-gray-400 px-4 py-4 pr-12 rounded-xl focus:outline-none resize-none overflow-hidden"
-            style="min-height: 56px; max-height: 200px;"
-            :placeholder="isReadOnly ? '此会话为 Pipeline 只读会话' : '输入消息... (Shift+Enter换行)'"
-            :disabled="isReadOnly"
+        <div class="max-w-4xl mx-auto relative bg-gray-50 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-400 transition-all shadow-sm">
+          <div
             ref="inputRef"
-            @input="adjustHeight"
-          ></textarea>
+            :class="['chat-input', { 'is-empty': !inputMessage.trim() }]"
+            :data-placeholder="isReadOnly ? '此会话为 Pipeline 只读会话' : '输入消息... (Shift+Enter换行)'"
+            @input="handleInput"
+            @keydown="handleKeydown"
+            @paste="handlePaste"
+            :contenteditable="!isReadOnly"
+          ></div>
           
           <div class="absolute right-2 bottom-2 flex items-center gap-2">
             <button 
               @click="sendMessage"
               :disabled="!inputMessage.trim() || loading || !selectedProjectId || !selectedModelGroup || isReadOnly"
-              class="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
+              class="send-button p-2 rounded-lg text-white disabled:opacity-50 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-sm"
             >
               <ArrowUp class="w-5 h-5" />
             </button>
@@ -350,7 +348,7 @@ const visibleMessages = computed<ParsedMessage[]>(() => {
 const inputMessage = ref('')
 const loading = ref(false)
 const chatContainer = ref<HTMLElement | null>(null)
-const inputRef = ref<HTMLTextAreaElement | null>(null)
+const inputRef = ref<HTMLElement | null>(null)
 
 const isReadOnly = computed(() => {
     if (!currentSessionId.value) return false
@@ -474,8 +472,117 @@ const handleGroupChange = () => {
 const adjustHeight = () => {
     if (inputRef.value) {
         inputRef.value.style.height = 'auto'
-        inputRef.value.style.height = inputRef.value.scrollHeight + 'px'
+        inputRef.value.style.height = Math.min(inputRef.value.scrollHeight, 200) + 'px'
     }
+}
+
+const handleInput = () => {
+    if (!inputRef.value) return
+    // Extract text content with links converted to markdown format
+    inputMessage.value = extractContentWithLinks(inputRef.value)
+    adjustHeight()
+}
+
+const extractContentWithLinks = (el: HTMLElement): string => {
+    let result = ''
+    el.childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            result += node.textContent || ''
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as HTMLElement
+            if (element.tagName === 'A') {
+                const href = element.getAttribute('href') || ''
+                const text = element.textContent || ''
+                if (href && text && href !== text) {
+                    result += `[${text}](${href})`
+                } else {
+                    result += href || text
+                }
+            } else if (element.tagName === 'BR') {
+                result += '\n'
+            } else if (element.tagName === 'DIV' || element.tagName === 'P') {
+                if (result && result.slice(-1) !== '\n') {
+                    result += '\n'
+                }
+                result += extractContentWithLinks(element)
+            } else {
+                result += extractContentWithLinks(element)
+            }
+        }
+    })
+    return result
+}
+
+const handleKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        sendMessage()
+    }
+}
+
+const handlePaste = (e: ClipboardEvent) => {
+    e.preventDefault()
+    const clipboardData = e.clipboardData
+    if (!clipboardData) return
+
+    const html = clipboardData.getData('text/html')
+    const plainText = clipboardData.getData('text/plain')
+
+    if (html) {
+        // Parse HTML and only keep <a> tags, strip everything else
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(html, 'text/html')
+        const sanitized = sanitizeHtml(doc.body)
+        
+        const selection = window.getSelection()
+        if (!selection || selection.rangeCount === 0) return
+        
+        const range = selection.getRangeAt(0)
+        range.deleteContents()
+        
+        const fragment = document.createDocumentFragment()
+        const temp = document.createElement('span')
+        temp.innerHTML = sanitized
+        while (temp.firstChild) {
+            fragment.appendChild(temp.firstChild)
+        }
+        range.insertNode(fragment)
+        
+        // Move cursor to end
+        range.collapse(false)
+        selection.removeAllRanges()
+        selection.addRange(range)
+    } else if (plainText) {
+        document.execCommand('insertText', false, plainText)
+    }
+
+    // Trigger input update
+    nextTick(() => {
+        handleInput()
+    })
+}
+
+const sanitizeHtml = (node: Node): string => {
+    let result = ''
+    node.childNodes.forEach(child => {
+        if (child.nodeType === Node.TEXT_NODE) {
+            result += child.textContent || ''
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const el = child as HTMLElement
+            if (el.tagName === 'A') {
+                const href = el.getAttribute('href') || ''
+                const text = el.textContent || ''
+                result += `<a href="${href}" target="_blank" class="input-link">${text}</a>`
+            } else if (el.tagName === 'BR') {
+                result += '<br>'
+            } else if (el.tagName === 'DIV' || el.tagName === 'P' || el.tagName === 'LI') {
+                result += sanitizeHtml(el) + '<br>'
+            } else {
+                result += sanitizeHtml(el)
+            }
+        }
+    })
+    return result
 }
 
 const scrollToBottom = async () => {
@@ -494,7 +601,10 @@ const sendMessage = async () => {
 
     const content = inputMessage.value.trim()
     inputMessage.value = ''
-    if(inputRef.value) inputRef.value.style.height = '56px';
+    if(inputRef.value) {
+        inputRef.value.innerHTML = ''
+        inputRef.value.style.height = '56px'
+    }
 
     // Add user message optimistic update
     messages.value.push({ role: 'user', content })
@@ -689,6 +799,74 @@ onMounted(async () => {
 .markdown-content a {
     color: #0969da;
     text-decoration: underline;
+}
+
+/* User message bubble - soft light indigo */
+.user-message-bubble {
+    background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+    color: #1e293b;
+    border: 1px solid #c7d2fe;
+}
+
+/* Links inside user messages - standard blue, clearly visible */
+.user-markdown a {
+    color: #2563eb !important;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.user-markdown a:hover {
+    color: #1d4ed8 !important;
+}
+
+.user-markdown code {
+    background-color: rgba(99, 102, 241, 0.1);
+    color: #4338ca;
+}
+
+/* Send button */
+.send-button {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+}
+.send-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4338ca, #4f46e5);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+/* Contenteditable input styling */
+.chat-input {
+    width: 100%;
+    background: transparent;
+    color: #111827;
+    padding: 1rem 3rem 1rem 1rem;
+    border-radius: 0.75rem;
+    outline: none;
+    resize: none;
+    overflow-y: auto;
+    min-height: 56px;
+    max-height: 200px;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.chat-input:empty::before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.chat-input.is-empty::before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.chat-input a,
+.chat-input .input-link {
+    color: #4f46e5;
+    text-decoration: underline;
+    cursor: pointer;
 }
 
 .markdown-content blockquote {
