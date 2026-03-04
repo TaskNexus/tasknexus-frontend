@@ -23,12 +23,12 @@
             class="border border-gray-200 rounded text-sm text-gray-600 h-9 pl-2 pr-8 focus:outline-none focus:border-blue-500 bg-white"
         >
            <option :value="''">状态</option>
-           <option value="CREATED">Created</option>
-           <option value="RUNNING">Running</option>
-           <option value="PAUSED">Paused</option>
-           <option value="FINISHED">Finished</option>
-           <option value="FAILED">Failed</option>
-           <option value="REVOKED">Revoked</option>
+           <option value="CREATED">已创建</option>
+           <option value="RUNNING">运行中</option>
+           <option value="PAUSED">暂停中</option>
+           <option value="FINISHED">已完成</option>
+           <option value="FAILED">已失败</option>
+           <option value="REVOKED">已终止</option>
         </select>
       </div>
     </div>
@@ -110,7 +110,7 @@
                      <td class="py-3 text-gray-500">{{ getProjectName(task.workflow) }}</td>
                      <td class="py-3 text-center">
                          <span :class="getStatusBadgeClass(task.status)" class="px-2 py-0.5 rounded text-xs font-medium">
-                             {{ task.status }}
+                             {{ getStatusLabel(task.status) }}
                          </span>
                      </td>
                      <td class="py-3 text-gray-500">{{ formatDate(task.started_at) }}</td>
@@ -188,6 +188,18 @@ const getStatusBadgeClass = (status: string) => {
         case 'FINISHED': return 'bg-green-100 text-green-600'
         case 'FAILED': return 'bg-red-100 text-red-600'
         case 'REVOKED': return 'bg-yellow-100 text-yellow-600'
+        default: return 'bg-gray-100'
+    }
+}
+
+const getStatusLabel = (status: String) => {
+    switch (status) {
+        case 'CREATED': return '已创建'
+        case 'RUNNING': return '运行中'
+        case 'FINISHED': return '已完成'
+        case 'FAILED': return '已失败'
+        case 'REVOKED': return '已终止'
+        case 'PAUSED': return '已暂停'
         default: return 'bg-gray-100'
     }
 }
