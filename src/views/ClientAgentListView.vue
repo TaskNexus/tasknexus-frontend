@@ -96,6 +96,74 @@
       </table>
     </div>
 
+    <!-- Download Section -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <Download class="w-5 h-5 text-blue-600" />
+          <h3 class="text-lg font-semibold text-gray-900">下载客户端代理</h3>
+        </div>
+        <div v-if="latestRelease" class="flex items-center gap-2">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            {{ latestRelease.tag_name }}
+          </span>
+          <a :href="latestRelease.html_url" target="_blank" class="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+            查看发布说明 →
+          </a>
+        </div>
+      </div>
+
+      <div v-if="releaseLoading" class="px-6 py-8 text-center text-gray-500">
+        <Loader2 class="w-6 h-6 mx-auto mb-2 animate-spin text-blue-500" />
+        <p class="text-sm">正在获取最新版本...</p>
+      </div>
+
+      <div v-else-if="releaseError" class="px-6 py-4">
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+          <AlertCircle class="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p class="text-sm text-yellow-800">无法获取最新版本信息</p>
+            <a href="https://github.com/TaskNexus/tasknexus-client-agent/releases" target="_blank"
+              class="text-sm text-blue-600 hover:underline">前往 GitHub 手动下载 →</a>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="latestRelease" class="p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <a v-for="asset in downloadAssets" :key="asset.name"
+            :href="asset.url" target="_blank"
+            class="group relative flex items-center gap-3 p-4 border rounded-lg transition-all"
+            :class="asset.recommended
+              ? 'border-blue-300 bg-blue-50 hover:border-blue-400 hover:shadow-md'
+              : 'border-gray-200 hover:border-blue-300 hover:shadow-md hover:bg-gray-50'"
+          >
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+              :class="asset.recommended ? 'bg-blue-100' : 'bg-gray-100'">
+              <component :is="asset.icon" class="w-5 h-5" :class="asset.recommended ? 'text-blue-600' : 'text-gray-500'" />
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-gray-900 truncate">{{ asset.label }}</div>
+              <div class="text-xs text-gray-500">{{ asset.arch }}</div>
+            </div>
+            <span v-if="asset.recommended"
+              class="absolute -top-2 -right-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-600 text-white shadow-sm">
+              推荐
+            </span>
+          </a>
+        </div>
+
+        <!-- Config file download -->
+        <div v-if="configAsset" class="mt-3 pt-3 border-t border-gray-100">
+          <a :href="configAsset.browser_download_url" target="_blank"
+            class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 transition-colors">
+            <FileText class="w-4 h-4" />
+            下载配置文件模板 (config.example.yaml)
+          </a>
+        </div>
+      </div>
+    </div>
+
     <!-- Start Command Info -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
       <h3 class="font-medium text-blue-900 mb-2">启动客户端代理</h3>
@@ -184,7 +252,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Monitor, Pencil, Trash2, Settings } from 'lucide-vue-next'
+import { Monitor, Pencil, Trash2, Settings, Download, Loader2, AlertCircle, FileText } from 'lucide-vue-next'
 import axios from 'axios'
 
 interface AgentWorkspace {
@@ -228,6 +296,94 @@ const deleteDialog = reactive({
   agentId: null as number | null,
   agentName: ''
 })
+
+// Release data
+interface ReleaseAsset {
+  name: string
+  browser_download_url: string
+  size: number
+}
+
+interface ReleaseInfo {
+  tag_name: string
+  html_url: string
+  assets: ReleaseAsset[]
+}
+
+const latestRelease = ref<ReleaseInfo | null>(null)
+const releaseLoading = ref(false)
+const releaseError = ref(false)
+
+interface DownloadAsset {
+  name: string
+  url: string
+  label: string
+  arch: string
+  icon: any
+  recommended: boolean
+}
+
+const platformIcons: Record<string, any> = {
+  linux: Monitor,
+  macos: Monitor,
+  windows: Monitor
+}
+
+const detectPlatform = (): string => {
+  const ua = navigator.userAgent.toLowerCase()
+  if (ua.indexOf('mac') >= 0) return 'macos'
+  if (ua.indexOf('win') >= 0) return 'windows'
+  return 'linux'
+}
+
+const downloadAssets = computed((): DownloadAsset[] => {
+  if (!latestRelease.value) return []
+  const currentPlatform = detectPlatform()
+  const assetMap = [
+    { match: 'linux-amd64', label: 'Linux', arch: 'x86_64 (amd64)', platform: 'linux' },
+    { match: 'linux-arm64', label: 'Linux', arch: 'ARM64', platform: 'linux' },
+    { match: 'macos-arm64', label: 'macOS', arch: 'Apple Silicon (ARM64)', platform: 'macos' },
+    { match: 'windows-x86_64', label: 'Windows', arch: 'x86_64', platform: 'windows' }
+  ]
+  const results: DownloadAsset[] = []
+  for (const item of assetMap) {
+    const asset = latestRelease.value.assets.find(a => a.name.indexOf(item.match) >= 0)
+    if (asset) {
+      results.push({
+        name: asset.name,
+        url: asset.browser_download_url,
+        label: item.label,
+        arch: item.arch,
+        icon: platformIcons[item.platform] || Monitor,
+        recommended: item.platform === currentPlatform
+      })
+    }
+  }
+  results.sort((a, b) => (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0))
+  return results
+})
+
+const configAsset = computed(() => {
+  return latestRelease.value?.assets.find(a => a.name === 'config.example.yaml') || null
+})
+
+const fetchLatestRelease = async () => {
+  releaseLoading.value = true
+  releaseError.value = false
+  try {
+    const response = await fetch(
+      'https://api.github.com/repos/TaskNexus/tasknexus-client-agent/releases/latest',
+      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+    )
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    latestRelease.value = await response.json()
+  } catch (error) {
+    console.error('Failed to fetch latest release:', error)
+    releaseError.value = true
+  } finally {
+    releaseLoading.value = false
+  }
+}
 
 const wsServerUrl = computed(() => {
   const host = window.location.host
@@ -310,5 +466,6 @@ const deleteAgent = async () => {
 
 onMounted(() => {
   fetchAgents()
+  fetchLatestRelease()
 })
 </script>
