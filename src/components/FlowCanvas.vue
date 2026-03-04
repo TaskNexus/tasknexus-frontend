@@ -674,7 +674,8 @@ const EDGE_COLORS = {
     default: '#e2e8f0', // slate-200
     success: '#22c55e', // green-500 (finished)
     running: '#3b82f6', // blue-500
-    failed: '#ef4444'   // red-500
+    failed: '#ef4444',  // red-500
+    revoked: '#9ca3af', // gray-400
 }
 
 // Expose graph instance to parent
@@ -782,6 +783,7 @@ defineExpose({
                         if (status === 'finished') color = EDGE_COLORS.success
                         else if (status === 'running') color = EDGE_COLORS.running
                         else if (status === 'failed') color = EDGE_COLORS.failed
+                        else if (status === 'revoked' || status === 'cancelled') color = EDGE_COLORS.revoked
                     }
                 }
                 

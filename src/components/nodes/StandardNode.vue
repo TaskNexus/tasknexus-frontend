@@ -75,6 +75,9 @@
         <span class="text-[9px] font-mono">{{ formatDuration(Math.round(elapsedTime)) }}</span>
         <Loader2 class="w-3 h-3 animate-spin" />
       </div>
+      <div v-if="status === 'revoked' || status === 'cancelled'" class="text-gray-400">
+        <Ban class="w-3 h-3" />
+      </div>
     </div>
 
     <!-- Body / Content -->
@@ -96,7 +99,7 @@
 import { computed, inject, ref, onMounted, onUnmounted } from 'vue'
 import * as LucideIcons from 'lucide-vue-next'
 // We still need specific icons for UI elements (loaders, checks) but node icons are dynamic.
-import { Loader2, CheckCircle2 } from 'lucide-vue-next'
+import { Loader2, CheckCircle2, Ban } from 'lucide-vue-next'
 import axios from 'axios'
 
 const props = defineProps<{
@@ -297,6 +300,7 @@ const containerStatusClass = computed(() => {
         case 'finished': return 'bg-green-50 border-green-200'
         case 'running': return 'bg-blue-50 border-blue-200'
         case 'failed': return 'bg-red-50 border-red-200'
+        case 'revoked': case 'cancelled': return 'bg-gray-50 border-gray-300'
         default: return 'bg-white border-slate-200'
     }
 })
@@ -317,6 +321,7 @@ const statusColorClass = computed(() => {
         case 'finished': return 'bg-green-500'
         case 'failed': return 'bg-red-500'
         case 'running': return 'bg-blue-500'
+        case 'revoked': case 'cancelled': return 'bg-gray-400'
         default: return 'bg-slate-300'
     }
 })
