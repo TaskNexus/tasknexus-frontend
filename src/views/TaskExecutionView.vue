@@ -313,9 +313,6 @@ const updateNodeStates = async () => {
         task.value = taskResp.data
         
         if (['FINISHED', 'FAILED', 'REVOKED'].includes(task.value.status)) {
-            // Check if we should stop polling... 
-            // But if user is viewing a subprocess, maybe we still want to poll?
-            // If whole task is finished, then statuses won't change.
             stopPolling()
         }
     } catch (e) {
@@ -424,7 +421,7 @@ const handleAction = async (action: 'pause' | 'resume' | 'revoke') => {
     actionLoading.value = true
     try {
         await axios.post(`/api/tasks/${taskId}/${action}/`)
-        await updateNodeStates() 
+        await updateNodeStates()
     } catch (e) {
         console.error(`Failed to ${action} task`, e)
         alert(`Failed to ${action} task`)
