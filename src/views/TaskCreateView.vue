@@ -199,47 +199,6 @@
             <h2 class="text-lg font-medium text-gray-900 mb-4 flex items-center justify-between">
                 <span>通知设置</span>
             </h2>
-            
-            <!-- Platform Notification -->
-            <div class="border border-gray-200 rounded-lg p-4 mb-4">
-                <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm font-medium text-gray-700">平台通知</span>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" v-model="notifyEnabled" class="sr-only peer">
-                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                </div>
-                <div v-if="notifyEnabled" class="space-y-3">
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-2">通知成员（已注册平台用户）</label>
-                        <div class="border border-gray-200 rounded-md p-2 max-h-36 overflow-y-auto">
-                            <div v-if="loadingUsers" class="text-center py-3">
-                                <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
-                            </div>
-                            <div v-else-if="userList.length === 0" class="text-center py-3">
-                                <p class="text-sm text-gray-500">未找到用户</p>
-                            </div>
-                            <div v-else>
-                                <label 
-                                    v-for="user in userList" 
-                                    :key="user.id"
-                                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer transition-colors"
-                                >
-                                    <input 
-                                        type="checkbox" 
-                                        :value="user.id" 
-                                        v-model="notifyUserIds"
-                                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span class="text-sm text-gray-700">{{ user.username }}</span>
-                                    <span v-if="user.first_name" class="text-xs text-gray-400">({{ user.first_name }})</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <p v-else class="text-xs text-gray-400">通知已注册平台的成员</p>
-            </div>
 
             <!-- Feishu Notification -->
             <div class="border border-gray-200 rounded-lg p-4">
@@ -253,33 +212,69 @@
                 <div v-if="feishuNotifyEnabled" class="space-y-3">
                     <div>
                         <label class="block text-xs text-gray-500 mb-2">飞书用户（无需注册平台）</label>
-                        <div class="border border-gray-200 rounded-md p-2 max-h-36 overflow-y-auto">
-                            <div v-if="loadingFeishuUsers" class="text-center py-3">
-                                <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
-                            </div>
-                            <!-- User list available -->
-                            <div v-else-if="feishuUserList.length > 0">
-                                <label 
-                                    v-for="user in feishuUserList" 
-                                    :key="user.open_id"
-                                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                        <div ref="feishuDropdownRef" class="relative">
+                            <button
+                                type="button"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-sm flex items-center justify-between gap-2 text-left hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                @click="feishuDropdownOpen = !feishuDropdownOpen"
+                            >
+                                <span class="truncate text-gray-700">{{ feishuSelectionSummary }}</span>
+                                <svg
+                                    class="w-4 h-4 text-gray-400 transition-transform"
+                                    :class="feishuDropdownOpen ? 'rotate-180' : ''"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    aria-hidden="true"
                                 >
-                                    <input 
-                                        type="checkbox" 
-                                        :value="user.open_id" 
-                                        v-model="feishuNotifyOpenIds"
-                                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                            <div
+                                v-if="feishuDropdownOpen"
+                                class="absolute z-20 mt-1 w-full border border-gray-200 rounded-md bg-white shadow-lg"
+                            >
+                                <div class="p-2 border-b border-gray-100">
+                                    <input
+                                        v-model="feishuUserSearch"
+                                        type="text"
+                                        class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                        placeholder="搜索飞书用户"
                                     />
-                                    <span class="text-sm text-gray-700">{{ user.name }}</span>
-                                </label>
-                            </div>
-                            <!-- API error -->
-                            <div v-else class="text-center py-3">
-                                <div v-if="feishuApiError" class="bg-amber-50 border border-amber-200 rounded p-2">
-                                    <p class="text-xs text-amber-700 font-medium">{{ feishuApiError }}</p>
-                                    <p v-if="feishuApiHint" class="text-xs text-amber-600 mt-0.5">{{ feishuApiHint }}</p>
                                 </div>
-                                <p v-else class="text-sm text-gray-500">无法获取飞书用户列表</p>
+                                <div class="max-h-56 overflow-y-auto p-1">
+                                    <div v-if="loadingFeishuUsers" class="text-center py-3">
+                                        <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
+                                    </div>
+                                    <template v-else-if="feishuUserList.length > 0">
+                                        <div v-if="filteredFeishuUsers.length === 0" class="text-center py-3">
+                                            <p class="text-sm text-gray-500">无匹配用户</p>
+                                        </div>
+                                        <template v-else>
+                                            <button
+                                                v-for="user in filteredFeishuUsers"
+                                                :key="user.open_id"
+                                                type="button"
+                                                class="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 text-left"
+                                                @click="toggleFeishuUser(user.open_id)"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
+                                                    :checked="feishuNotifyOpenIds.includes(user.open_id)"
+                                                    readonly
+                                                />
+                                                <span class="text-sm text-gray-700">{{ user.name }}</span>
+                                            </button>
+                                        </template>
+                                    </template>
+                                    <div v-else class="text-center py-3">
+                                        <div v-if="feishuApiError" class="bg-amber-50 border border-amber-200 rounded p-2">
+                                            <p class="text-xs text-amber-700 font-medium">{{ feishuApiError }}</p>
+                                            <p v-if="feishuApiHint" class="text-xs text-amber-600 mt-0.5">{{ feishuApiHint }}</p>
+                                        </div>
+                                        <p v-else class="text-sm text-gray-500">无法获取飞书用户列表</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -312,7 +307,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
@@ -385,13 +380,6 @@ const cronDescription = computed(() => describeCron(cronExpression.value))
 const planTime = ref('')
 const webhookSecret = ref('')
 
-// Notification settings
-const notifyEnabled = ref(false)
-const notifyUserIds = ref<number[]>([])
-const userList = ref<any[]>([])
-const loadingUsers = ref(false)
-const currentUserId = ref<number | null>(null)
-
 // Feishu direct notification
 const feishuNotifyEnabled = ref(false)
 const feishuNotifyOpenIds = ref<string[]>([])
@@ -400,13 +388,20 @@ const loadingFeishuUsers = ref(false)
 const feishuApiError = ref('')
 const feishuApiHint = ref('')
 const feishuFetched = ref(false)
+const feishuDropdownOpen = ref(false)
+const feishuUserSearch = ref('')
+const feishuDropdownRef = ref<HTMLElement | null>(null)
 
 watch(feishuNotifyEnabled, (val) => {
     if (val && !feishuFetched.value) {
         feishuFetched.value = true
         fetchFeishuUsers()
+    } else if (!val) {
+        feishuDropdownOpen.value = false
+        feishuUserSearch.value = ''
     }
 })
+
 // For scheduled task, we might need original status checks, but editing usually restricted to pending.
 
 // Params
@@ -454,9 +449,47 @@ const isValid = computed(() => {
     return true
 })
 
+const filteredFeishuUsers = computed(() => {
+    const q = feishuUserSearch.value.trim().toLowerCase()
+    if (!q) return feishuUserList.value
+    return feishuUserList.value.filter((user) => {
+        const name = String(user.name || '').toLowerCase()
+        const openId = String(user.open_id || '').toLowerCase()
+        return name.includes(q) || openId.includes(q)
+    })
+})
+
+const feishuSelectionSummary = computed(() => {
+    const selectedUsers = feishuUserList.value.filter((user) => feishuNotifyOpenIds.value.includes(user.open_id))
+    if (selectedUsers.length === 0) return '请选择飞书用户'
+    const names = selectedUsers.map((user) => user.name)
+    if (names.length <= 2) return names.join(', ')
+    return `${names.slice(0, 2).join(', ')} +${names.length - 2}`
+})
+
+const toggleFeishuUser = (openId: string) => {
+    if (feishuNotifyOpenIds.value.includes(openId)) {
+        feishuNotifyOpenIds.value = feishuNotifyOpenIds.value.filter((id) => id !== openId)
+    } else {
+        feishuNotifyOpenIds.value = [...feishuNotifyOpenIds.value, openId]
+    }
+}
+
+const handleDropdownOutsideClick = (event: MouseEvent) => {
+    const target = event.target as Node
+    if (feishuDropdownRef.value && !feishuDropdownRef.value.contains(target)) {
+        feishuDropdownOpen.value = false
+    }
+}
+
+watch(feishuDropdownOpen, (open) => {
+    if (!open) feishuUserSearch.value = ''
+})
+
 // Setup
 onMounted(async () => {
-    await Promise.all([fetchWorkflows(), fetchCurrentUser(), fetchUsers()])
+    document.addEventListener('click', handleDropdownOutsideClick)
+    await fetchWorkflows()
     
     if (isEditMode.value && editTaskId.value) {
         await loadTaskForEdit()
@@ -464,6 +497,10 @@ onMounted(async () => {
         selectedWorkflowId.value = routeWorkflowId
         await fetchWorkflowDetails(routeWorkflowId)
     }
+})
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleDropdownOutsideClick)
 })
 
 const loadTaskForEdit = async () => {
@@ -539,12 +576,6 @@ const loadTaskForEdit = async () => {
         })
         
         // Restore notification settings
-        if (data.notify_enabled !== undefined) {
-            notifyEnabled.value = data.notify_enabled
-        }
-        if (Array.isArray(data.notify_user_ids)) {
-            notifyUserIds.value = data.notify_user_ids
-        }
         if (data.feishu_notify_enabled !== undefined) {
             feishuNotifyEnabled.value = data.feishu_notify_enabled
         }
@@ -585,31 +616,6 @@ const fetchWorkflows = async () => {
     }
 }
 
-const fetchCurrentUser = async () => {
-    try {
-        const { data } = await axios.get('/api/auth/me/')
-        currentUserId.value = data.id
-        // Default: select current user for notification
-        if (!isEditMode.value) {
-            notifyUserIds.value = [data.id]
-        }
-    } catch (e) {
-        console.error('Failed to fetch current user', e)
-    }
-}
-
-const fetchUsers = async () => {
-    loadingUsers.value = true
-    try {
-        const { data } = await axios.get('/api/auth/users/')
-        userList.value = Array.isArray(data) ? data : (data.results || [])
-    } catch (e) {
-        console.error('Failed to fetch users', e)
-    } finally {
-        loadingUsers.value = false
-    }
-}
-
 const fetchFeishuUsers = async () => {
     loadingFeishuUsers.value = true
     feishuApiError.value = ''
@@ -617,6 +623,8 @@ const fetchFeishuUsers = async () => {
     try {
         const { data } = await axios.get('/api/feishu/users/')
         feishuUserList.value = data.users || []
+        const validOpenIds = new Set(feishuUserList.value.map((user) => user.open_id))
+        feishuNotifyOpenIds.value = feishuNotifyOpenIds.value.filter((id) => validOpenIds.has(id))
         if (data.error) {
             feishuApiError.value = data.error
             feishuApiHint.value = data.hint || ''
@@ -659,14 +667,6 @@ const applyReplayContext = async () => {
         // Restore task name
         if (data.name) {
             taskName.value = data.name
-        }
-        
-        // Restore notification settings
-        if (data.notify_enabled !== undefined) {
-            notifyEnabled.value = data.notify_enabled
-        }
-        if (Array.isArray(data.notify_user_ids)) {
-            notifyUserIds.value = data.notify_user_ids
         }
         
         // Restore Feishu notification settings
@@ -769,8 +769,8 @@ const handleCreateAction = async () => {
             name: taskName.value,
             workflow: selectedWorkflowId.value,
             context: context,
-            notify_enabled: notifyEnabled.value,
-            notify_user_ids: notifyEnabled.value ? notifyUserIds.value : [],
+            notify_enabled: false,
+            notify_user_ids: [],
             feishu_notify_enabled: feishuNotifyEnabled.value,
             feishu_notify_open_ids: feishuNotifyEnabled.value ? feishuNotifyOpenIds.value : []
         }
