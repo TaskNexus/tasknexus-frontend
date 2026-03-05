@@ -85,29 +85,16 @@
                         placeholder="*/5 * * * *"
                         />
                     </div>
-                    <div class="bg-white/70 rounded p-3 border border-blue-100 text-xs space-y-2">
-                        <p class="font-semibold text-blue-800">格式：分 时 日 月 周</p>
-                        <div class="grid grid-cols-5 gap-1 text-center text-blue-700 font-mono">
-                            <span class="bg-blue-100 rounded px-1 py-0.5">分(0-59)</span>
-                            <span class="bg-blue-100 rounded px-1 py-0.5">时(0-23)</span>
-                            <span class="bg-blue-100 rounded px-1 py-0.5">日(1-31)</span>
-                            <span class="bg-blue-100 rounded px-1 py-0.5">月(1-12)</span>
-                            <span class="bg-blue-100 rounded px-1 py-0.5">周(0-6)</span>
-                        </div>
-                        <div class="space-y-1 text-gray-600 pt-1 border-t border-blue-100">
-                            <p class="font-medium text-blue-700">常用示例：</p>
-                            <div class="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                                <span><code class="text-blue-600">*/5 * * * *</code> — 每5分钟</span>
-                                <span><code class="text-blue-600">0 * * * *</code> — 每小时整点</span>
-                                <span><code class="text-blue-600">0 9 * * *</code> — 每天9:00</span>
-                                <span><code class="text-blue-600">0 9 * * 1</code> — 每周一9:00</span>
-                                <span><code class="text-blue-600">0 9 1 * *</code> — 每月1日9:00</span>
-                                <span><code class="text-blue-600">30 8 * * 1-5</code> — 工作日8:30</span>
-                            </div>
-                        </div>
-                        <div class="text-gray-500 pt-1 border-t border-blue-100">
-                            <code>*</code> 任意值 &nbsp; <code>*/n</code> 每隔n &nbsp; <code>a-b</code> 范围 &nbsp; <code>a,b</code> 列表
-                        </div>
+                    <div class="bg-white rounded border border-blue-100 p-3">
+                        <p class="text-xs font-medium text-blue-700 mb-2">可视化编辑器</p>
+                        <CronLight
+                            :model-value="cronExpression"
+                            format="crontab"
+                            locale="zh"
+                            @update:model-value="handleCronModelUpdate"
+                            @error="handleCronEditorError"
+                        />
+                        <p v-if="cronUiError" class="mt-2 text-xs text-red-600">{{ cronUiError }}</p>
                     </div>
                     <div v-if="cronDescription" class="flex items-center gap-1.5 text-xs px-1">
                         <span class="text-green-600">⏱</span>
@@ -296,7 +283,7 @@
                 :disabled="!isValid"
                 class="px-6 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-blue-200"
             >
-                <Loader2 v-if="creating" class="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 v-if="submitting" class="w-4 h-4 mr-2 animate-spin" />
                 {{ submitButtonText }}
             </button>
         </div>
@@ -311,54 +298,10 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
+import { CronLight } from '@vue-js-cron/light'
+import '@vue-js-cron/light/dist/light.css'
 import { fetchAllPages } from '../utils/pagination'
-
-// Cron expression to Chinese description
-const WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'] as const
-function describeCron(expr: string): string {
-    try {
-        const p = expr.trim().split(/\s+/)
-        if (p.length !== 5) return ''
-        const [mi, hr, dom, mon, dow] = p
-        const pad = (s: string) => s.length === 1 ? '0' + s : s
-        let when = ''
-        let time = ''
-
-        // Time part
-        if (mi.match(/^\*\/\d+$/) && hr === '*') {
-            return `每 ${mi.slice(2)} 分钟执行一次`
-        }
-        if (hr.match(/^\*\/\d+$/) && mi === '0') {
-            return `每 ${hr.slice(2)} 小时执行一次`
-        }
-        if (hr !== '*' && mi !== '*') {
-            time = `${pad(hr)}:${pad(mi)}`
-        } else if (hr !== '*') {
-            time = `${pad(hr)} 时`
-        } else if (mi !== '*') {
-            time = `每小时第 ${mi} 分`
-        }
-
-        // Date part
-        if (dow !== '*' && dow !== '0-6') {
-            const days = dow.split(',').map(d => {
-                if (d.includes('-')) {
-                    const [a, b] = d.split('-')
-                    return `周${WEEK_NAMES[+a]}至周${WEEK_NAMES[+b]}`
-                }
-                return `周${WEEK_NAMES[+d]}`
-            }).join('、')
-            when = days
-        } else if (mon !== '*' && dom !== '*') {
-            when = `${mon} 月 ${dom} 日`
-        } else if (dom !== '*') {
-            when = `每月 ${dom} 日`
-        } else {
-            when = '每天'
-        }
-        return time ? `${when} ${time} 执行` : `${when}执行`
-    } catch { return '' }
-}
+import { formatCronZh, splitCronToPayload } from '../utils/cron'
 
 const route = useRoute()
 const router = useRouter()
@@ -376,7 +319,8 @@ const workflowName = ref('')
 const projectId = ref<number | null>(null)
 const taskName = ref('')
 const cronExpression = ref('*/5 * * * *')
-const cronDescription = computed(() => describeCron(cronExpression.value))
+const cronUiError = ref('')
+const cronDescription = computed(() => formatCronZh(cronExpression.value, ''))
 const planTime = ref('')
 const webhookSecret = ref('')
 
@@ -443,7 +387,11 @@ const submitButtonText = computed(() => {
 const isValid = computed(() => {
     if (!selectedWorkflowId.value || !taskName.value || submitting.value) return false
     
-    if (selectedTaskType.value === 'periodic' && !cronExpression.value) return false
+    if (selectedTaskType.value === 'periodic') {
+        if (!cronExpression.value.trim()) return false
+        if (cronUiError.value) return false
+        if (!splitCronToPayload(cronExpression.value)) return false
+    }
     if (selectedTaskType.value === 'scheduled' && !planTime.value) return false
     
     return true
@@ -480,6 +428,14 @@ const handleDropdownOutsideClick = (event: MouseEvent) => {
     if (feishuDropdownRef.value && !feishuDropdownRef.value.contains(target)) {
         feishuDropdownOpen.value = false
     }
+}
+
+const handleCronModelUpdate = (value: string) => {
+    cronExpression.value = value
+}
+
+const handleCronEditorError = (value: string) => {
+    cronUiError.value = value || ''
 }
 
 watch(feishuDropdownOpen, (open) => {
@@ -784,23 +740,13 @@ const handleCreateAction = async () => {
                 ? `/api/tasks/periodic/${editTaskId.value}/` 
                 : '/api/tasks/periodic/'
             method = isEditMode.value ? 'put' : 'post'
-            
-            // Handle Cron Parsing
-            // For now, assume backend accepts 'cron_expression' or we need to split it
-            // Backend serializer currently takes: minute, hour, day_of_week... 
-            // We need to parse "min hr dom moy dow"
-            const parts = cronExpression.value.split(' ')
-            if (parts.length === 5) {
-                payload.minute = parts[0]
-                payload.hour = parts[1]
-                payload.day_of_month = parts[2]
-                payload.month_of_year = parts[3]
-                payload.day_of_week = parts[4]
-            } else {
-                // If special string like @daily? Backend serializer might fail.
-                // Fallback to defaults or error?
-                // For this implementation, try sending individual fields.
+
+            const cronPayload = splitCronToPayload(cronExpression.value)
+            if (!cronPayload || cronUiError.value) {
+                alert('Cron 表达式无效，请修正后再提交。')
+                return
             }
+            Object.assign(payload, cronPayload)
 
             payload.enabled = true
             redirectRoute = { name: 'tasks-periodic' }

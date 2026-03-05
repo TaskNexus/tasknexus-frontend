@@ -21,7 +21,7 @@
                     <th class="py-3 font-medium w-16">ID</th>
                     <th class="py-3 font-medium">任务名称</th>
                     <th class="py-3 font-medium">工作流</th>
-                    <th class="py-3 font-medium">Cron 表达式</th>
+                    <th class="py-3 font-medium">Cron 描述</th>
                     <th class="py-3 font-medium">上次运行时间</th>
                     <th class="py-3 font-medium">创建者</th>
                     <th class="py-3 font-medium text-center">运行次数</th>
@@ -44,8 +44,8 @@
                      <td class="py-3 text-blue-600 cursor-pointer hover:underline" @click="goToWorkflow(task.workflow)">
                          {{ task.workflow_name || 'Unknown' }}
                      </td>
-                     <td class="py-3 font-mono text-xs bg-gray-50 px-2 py-1 rounded w-max">
-                         {{ task.cron_expression }}
+                     <td class="py-3 text-xs text-gray-700">
+                         {{ formatCronZh(task.cron_expression) }}
                      </td>
                      <td class="py-3 text-gray-500">{{ formatDate(task.last_run_at) }}</td>
                      <td class="py-3 text-gray-500">{{ task.creator_username || '-' }}</td>
@@ -89,6 +89,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import ListPagination from '../components/ListPagination.vue'
+import { formatCronZh } from '../utils/cron'
 
 const router = useRouter()
 const route = useRoute()
