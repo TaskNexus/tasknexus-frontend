@@ -81,6 +81,13 @@
             </tbody>
         </table>
     </div>
+    <ListPagination
+      :total="totalCount"
+      :currentPage="currentPage"
+      :pageSize="pageSize"
+      @update:currentPage="handlePageChange"
+      @update:pageSize="handlePageSizeChange"
+    />
     
     <!-- Toast Notification -->
     <div v-if="showToast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg text-sm">
@@ -91,21 +98,74 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import ListPagination from '../components/ListPagination.vue'
 
 const router = useRouter()
+const route = useRoute()
+const parsePageParam = (value: unknown, fallback: number) => {
+    const raw = Array.isArray(value) ? value[0] : value
+    const parsed = Number(raw)
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
 const tasks = ref<any[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
+const currentPage = ref(parsePageParam(route.query.page, 1))
+const pageSize = ref(parsePageParam(route.query.page_size, 20))
+const totalCount = ref(0)
+
+const syncPaginationQuery = () => {
+    router.replace({
+        query: {
+            ...route.query,
+            page: String(currentPage.value),
+            page_size: String(pageSize.value)
+        }
+    })
+}
 
 const fetchTasks = async () => {
     try {
-        const response = await axios.get('/api/tasks/webhook/')
-        tasks.value = response.data.results || response.data
+        const response = await axios.get('/api/tasks/webhook/', {
+            params: {
+                page: currentPage.value,
+                page_size: pageSize.value
+            }
+        })
+        if (Array.isArray(response.data)) {
+            tasks.value = response.data
+            totalCount.value = response.data.length
+        } else {
+            tasks.value = response.data.results || []
+            totalCount.value = response.data.count ?? tasks.value.length
+        }
     } catch (e) {
         console.error("Failed to fetch webhook tasks", e)
     }
+}
+
+const adjustPageAfterMutation = (deletedCount: number) => {
+    const nextTotal = Math.max(0, totalCount.value - deletedCount)
+    const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize.value))
+    if (currentPage.value > maxPage) {
+        currentPage.value = maxPage
+        syncPaginationQuery()
+    }
+}
+
+const handlePageChange = (page: number) => {
+    currentPage.value = page
+    syncPaginationQuery()
+    fetchTasks()
+}
+
+const handlePageSizeChange = (size: number) => {
+    pageSize.value = size
+    currentPage.value = 1
+    syncPaginationQuery()
+    fetchTasks()
 }
 
 const formatDate = (dateStr?: string) => {
@@ -177,6 +237,7 @@ const deleteTask = async (id: number) => {
     if (!confirm("Are you sure you want to delete this webhook task? This cannot be undone.")) return
     try {
         await axios.delete(`/api/tasks/webhook/${id}/`)
+        adjustPageAfterMutation(1)
         fetchTasks()
     } catch (e) {
         console.error("Failed to delete task", e)
@@ -200,6 +261,7 @@ const handleEdit = (task: any) => {
 }
 
 onMounted(() => {
+    syncPaginationQuery()
     fetchTasks()
 })
 </script>

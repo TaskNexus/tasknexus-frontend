@@ -94,6 +94,13 @@
           </tr>
         </tbody>
       </table>
+      <ListPagination
+        :total="totalCount"
+        :currentPage="currentPage"
+        :pageSize="pageSize"
+        @update:currentPage="handlePageChange"
+        @update:pageSize="handlePageSizeChange"
+      />
     </div>
 
     <!-- Download Section -->
@@ -252,8 +259,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { Monitor, Pencil, Trash2, Settings, Download, Loader2, AlertCircle, FileText } from 'lucide-vue-next'
 import axios from 'axios'
+import ListPagination from '../components/ListPagination.vue'
 
 interface AgentWorkspace {
   id: number
@@ -281,8 +290,19 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+
+const parsePageParam = (value: unknown, fallback: number) => {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
 
 const agents = ref<ClientAgent[]>([])
+const currentPage = ref(parsePageParam(route.query.page, 1))
+const pageSize = ref(parsePageParam(route.query.page_size, 20))
+const totalCount = ref(0)
 const showEditDialog = ref(false)
 const editingAgentId = ref<number | null>(null)
 
@@ -414,10 +434,53 @@ const formatTime = (time: string | null) => {
 
 const fetchAgents = async () => {
   try {
-    const response = await axios.get('/api/client-agents/agents/')
-    agents.value = response.data
+    const response = await axios.get('/api/client-agents/agents/', {
+      params: {
+        page: currentPage.value,
+        page_size: pageSize.value
+      }
+    })
+    if (Array.isArray(response.data)) {
+      agents.value = response.data
+      totalCount.value = response.data.length
+    } else {
+      agents.value = response.data.results || []
+      totalCount.value = response.data.count ?? agents.value.length
+    }
   } catch (error) {
     console.error('Failed to fetch agents:', error)
+  }
+}
+
+const syncPaginationQuery = () => {
+  router.replace({
+    query: {
+      ...route.query,
+      page: String(currentPage.value),
+      page_size: String(pageSize.value)
+    }
+  })
+}
+
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  syncPaginationQuery()
+  fetchAgents()
+}
+
+const handlePageSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  syncPaginationQuery()
+  fetchAgents()
+}
+
+const adjustPageAfterMutation = (deletedCount: number) => {
+  const nextTotal = Math.max(0, totalCount.value - deletedCount)
+  const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize.value))
+  if (currentPage.value > maxPage) {
+    currentPage.value = maxPage
+    syncPaginationQuery()
   }
 }
 
@@ -458,6 +521,7 @@ const deleteAgent = async () => {
   try {
     await axios.delete(`/api/client-agents/agents/${deleteDialog.agentId}/`)
     deleteDialog.show = false
+    adjustPageAfterMutation(1)
     fetchAgents()
   } catch (error) {
     console.error('Failed to delete agent:', error)
@@ -465,6 +529,7 @@ const deleteAgent = async () => {
 }
 
 onMounted(() => {
+  syncPaginationQuery()
   fetchAgents()
   fetchLatestRelease()
 })

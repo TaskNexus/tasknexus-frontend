@@ -19,7 +19,7 @@
         
         <select 
             v-model="selectedStatus" 
-            @change="fetchTasks"
+            @change="refreshFromFirstPage"
             class="border border-gray-200 rounded text-sm text-gray-600 h-9 pl-2 pr-8 focus:outline-none focus:border-blue-500 bg-white"
         >
            <option :value="''">状态</option>
@@ -41,14 +41,14 @@
                 <span class="text-sm text-gray-500 mr-2 w-16 text-right">任务名称:</span>
                 <input 
                     v-model="searchName"
-                    @keyup.enter="fetchTasks"
+                    @keyup.enter="refreshFromFirstPage"
                     type="text" 
                     placeholder="搜索任务名称" 
                     class="border border-gray-200 rounded px-2 py-1 text-sm w-40 focus:outline-none focus:border-blue-500"
                 >
             </div>
              <div class="flex items-center ml-4">
-                 <button class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" @click="fetchTasks">过滤</button>
+                 <button class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" @click="refreshFromFirstPage">过滤</button>
                  <button class="bg-white border border-gray-200 text-gray-600 px-4 py-1.5 rounded text-sm ml-2 hover:bg-gray-50" @click="resetFilters">重置</button>
             </div>
           </div>
@@ -124,16 +124,30 @@
             </tbody>
         </table>
     </div>
+    <ListPagination
+      :total="totalCount"
+      :currentPage="currentPage"
+      :pageSize="pageSize"
+      @update:currentPage="handlePageChange"
+      @update:pageSize="handlePageSizeChange"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import ListPagination from '../components/ListPagination.vue'
 
 const router = useRouter()
 const route = useRoute()
+
+const parsePageParam = (value: unknown, fallback: number) => {
+    const raw = Array.isArray(value) ? value[0] : value
+    const parsed = Number(raw)
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
 
 // Filters
 const selectedProject = ref(route.query.project_id || '')
@@ -145,6 +159,9 @@ const searchName = ref('')
 // Data
 const projects = ref<any[]>([])
 const tasks = ref<any[]>([])
+const currentPage = ref(parsePageParam(route.query.page, 1))
+const pageSize = ref(parsePageParam(route.query.page_size, 20))
+const totalCount = ref(0)
 
 // Selection
 const selectedTasks = ref<number[]>([])
@@ -166,14 +183,36 @@ const fetchTasks = async () => {
         if (selectedScheduledTask.value) params.scheduled_task_id = selectedScheduledTask.value
         if (selectedStatus.value) params.status = selectedStatus.value
         if (searchName.value) params.name = searchName.value
+        params.page = currentPage.value
+        params.page_size = pageSize.value
         
         const response = await axios.get('/api/tasks/', { params })
-        tasks.value = response.data.results || response.data 
+        if (Array.isArray(response.data)) {
+            tasks.value = response.data
+            totalCount.value = response.data.length
+        } else {
+            tasks.value = response.data.results || []
+            totalCount.value = response.data.count ?? tasks.value.length
+        }
         // Reset selection on refetch
         selectedTasks.value = []
     } catch(e) {
         console.error("Failed to fetch tasks", e)
     }
+}
+
+const syncPaginationQuery = () => {
+    const query: Record<string, any> = {
+        ...route.query,
+        page: String(currentPage.value),
+        page_size: String(pageSize.value)
+    }
+    if (selectedProject.value) {
+        query.project_id = String(selectedProject.value)
+    } else {
+        delete query.project_id
+    }
+    router.replace({ query })
 }
 
 // Helper to get project info (optimistic)
@@ -210,14 +249,44 @@ const formatDate = (dateStr?: string) => {
 }
 
 const handleProjectChange = () => {
+    refreshFromFirstPage()
+}
+
+const refreshFromFirstPage = () => {
+    if (currentPage.value !== 1) {
+        currentPage.value = 1
+    }
+    syncPaginationQuery()
     fetchTasks()
+}
+
+const handlePageChange = (page: number) => {
+    currentPage.value = page
+    syncPaginationQuery()
+    fetchTasks()
+}
+
+const handlePageSizeChange = (size: number) => {
+    pageSize.value = size
+    currentPage.value = 1
+    syncPaginationQuery()
+    fetchTasks()
+}
+
+const adjustPageAfterMutation = (deletedCount: number) => {
+    const nextTotal = Math.max(0, totalCount.value - deletedCount)
+    const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize.value))
+    if (currentPage.value > maxPage) {
+        currentPage.value = maxPage
+        syncPaginationQuery()
+    }
 }
 
 const resetFilters = () => {
     selectedProject.value = ''
     selectedStatus.value = ''
     searchName.value = ''
-    fetchTasks()
+    refreshFromFirstPage()
 }
 
 const viewDetail = (taskId: number) => {
@@ -242,9 +311,8 @@ const deleteTask = async (id: number) => {
     
     try {
         await axios.delete(`/api/tasks/${id}/`)
-        // Remove locally
-        tasks.value = tasks.value.filter(t => t.id !== id)
-        selectedTasks.value = selectedTasks.value.filter(sid => sid !== id)
+        adjustPageAfterMutation(1)
+        await fetchTasks()
     } catch (e) {
         console.error('Failed to delete task', e)
         alert('Failed to delete task')
@@ -257,7 +325,7 @@ const batchDelete = async () => {
     
     try {
         await axios.post('/api/tasks/bulk_delete/', { ids: selectedTasks.value })
-        // Refresh or remove locally
+        adjustPageAfterMutation(selectedTasks.value.length)
         await fetchTasks()
     } catch (e) {
         console.error('Failed to batch delete', e)
@@ -267,22 +335,27 @@ const batchDelete = async () => {
 
 // Selection Logic
 const isAllSelected = computed(() => {
-    return tasks.value.length > 0 && selectedTasks.value.length === tasks.value.length
+    if (tasks.value.length === 0) return false
+    return tasks.value.every(task => selectedTasks.value.includes(task.id))
 })
 
 const isIndeterminate = computed(() => {
-    return selectedTasks.value.length > 0 && selectedTasks.value.length < tasks.value.length
+    const pageIds = tasks.value.map(task => task.id)
+    const selectedOnPage = pageIds.filter(id => selectedTasks.value.includes(id)).length
+    return selectedOnPage > 0 && selectedOnPage < pageIds.length
 })
 
 const toggleAll = (e: any) => {
+    const pageIds = tasks.value.map(task => task.id)
     if (e.target.checked) {
-        selectedTasks.value = tasks.value.map(t => t.id)
+        selectedTasks.value = Array.from(new Set([...selectedTasks.value, ...pageIds]))
     } else {
-        selectedTasks.value = []
+        selectedTasks.value = selectedTasks.value.filter(id => !pageIds.includes(id))
     }
 }
 
 onMounted(async () => {
+    syncPaginationQuery()
     await fetchProjects()
     await fetchTasks()
 })

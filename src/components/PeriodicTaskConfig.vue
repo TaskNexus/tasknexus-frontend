@@ -101,6 +101,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import axios from 'axios'
+import { fetchAllPages } from '../utils/pagination'
 
 const props = defineProps<{
     isOpen: boolean
@@ -128,8 +129,7 @@ const computedCron = computed(() => {
 
 const fetchWorkflows = async () => {
     try {
-        const response = await axios.get('/api/workflows/')
-        workflows.value = response.data
+        workflows.value = await fetchAllPages('/api/workflows/')
     } catch (e) {
         console.error(e)
     }

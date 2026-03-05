@@ -316,6 +316,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
+import { fetchAllPages } from '../utils/pagination'
 
 // Cron expression to Chinese description
 const WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'] as const
@@ -578,8 +579,7 @@ watch(selectedTaskType, (newVal, oldVal) => {
 // Methods
 const fetchWorkflows = async () => {
     try {
-        const { data } = await axios.get('/api/workflows/')
-        workflows.value = data
+        workflows.value = await fetchAllPages('/api/workflows/')
     } catch (e) {
         console.error("Failed to fetch workflows", e)
     }

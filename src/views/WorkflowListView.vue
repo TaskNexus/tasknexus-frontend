@@ -40,7 +40,7 @@
             <input type="text" placeholder="请输入" class="border border-gray-200 rounded px-2 py-1 text-sm w-40 focus:outline-none focus:border-blue-500">
         </div>
          <div class="flex-1 text-right">
-             <button class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" @click="fetchWorkflows">过滤</button>
+             <button class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" @click="refreshFromFirstPage">过滤</button>
              <button class="bg-white border border-gray-200 text-gray-600 px-4 py-1.5 rounded text-sm ml-2 hover:bg-gray-50" @click="resetFilters">重置</button>
         </div>
       </div>
@@ -83,6 +83,9 @@
                 </tr>
             </thead>
             <tbody class="text-sm text-gray-700">
+                <tr v-if="workflows.length === 0" class="border-b border-gray-50">
+                    <td colspan="8" class="py-10 text-center text-gray-400">暂无工作流</td>
+                </tr>
                 <tr v-for="flow in workflows" :key="flow.id" class="border-b border-gray-50 hover:bg-blue-50/30 transition-colors group">
                      <td class="py-3 text-center"><input type="checkbox"></td>
                      <td class="py-3">{{ flow.id }}</td>
@@ -110,6 +113,13 @@
             </tbody>
         </table>
     </div>
+    <ListPagination
+      :total="totalCount"
+      :currentPage="currentPage"
+      :pageSize="pageSize"
+      @update:currentPage="handlePageChange"
+      @update:pageSize="handlePageSizeChange"
+    />
   </div>
 </template>
 
@@ -119,12 +129,23 @@ import { useRouter, useRoute } from 'vue-router'
 import { Plus } from 'lucide-vue-next'
 // import CreateTaskModal from '../components/CreateTaskModal.vue' // No longer used here
 import axios from 'axios' // Use configured axios instance in real app
+import ListPagination from '../components/ListPagination.vue'
 
 const route = useRoute()
 const router = useRouter()
 const activeTag = ref('全部')
 const selectedProject = ref(route.query.project_id || '')
 const projects = ref<any[]>([])
+
+const parsePageParam = (value: unknown, fallback: number) => {
+    const raw = Array.isArray(value) ? value[0] : value
+    const parsed = Number(raw)
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const currentPage = ref(parsePageParam(route.query.page, 1))
+const pageSize = ref(parsePageParam(route.query.page_size, 20))
+const totalCount = ref(0)
 
 interface Workflow {
   id: number
@@ -163,15 +184,22 @@ const fetchWorkflows = async () => {
       if (selectedProject.value) {
           params.project = selectedProject.value
       }
+      if (activeTag.value !== '全部') {
+          params.tag = activeTag.value
+      }
+      params.page = currentPage.value
+      params.page_size = pageSize.value
       
       // Add logic for other filters (search inputs) here if needed
       
       const response = await axios.get('/api/workflows/', { params })
       if (response.data) {
-         workflows.value = response.data
-         // Filter by tag locally for now as tags are JSONField list
-         if (activeTag.value !== '全部') {
-             workflows.value = workflows.value.filter(w => w.tags && w.tags.includes(activeTag.value))
+         if (Array.isArray(response.data)) {
+            workflows.value = response.data
+            totalCount.value = response.data.length
+         } else {
+            workflows.value = response.data.results || []
+            totalCount.value = response.data.count ?? workflows.value.length
          }
       }
     } catch (e) {
@@ -179,29 +207,69 @@ const fetchWorkflows = async () => {
     }
 }
 
+const refreshFromFirstPage = () => {
+    if (currentPage.value !== 1) {
+        currentPage.value = 1
+    }
+    syncPaginationQuery()
+    fetchWorkflows()
+}
+
+const handlePageChange = (page: number) => {
+    currentPage.value = page
+    syncPaginationQuery()
+    fetchWorkflows()
+}
+
+const handlePageSizeChange = (size: number) => {
+    pageSize.value = size
+    currentPage.value = 1
+    syncPaginationQuery()
+    fetchWorkflows()
+}
+
+const adjustPageAfterMutation = (deletedCount: number) => {
+    const nextTotal = Math.max(0, totalCount.value - deletedCount)
+    const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize.value))
+    if (currentPage.value > maxPage) {
+        currentPage.value = maxPage
+        syncPaginationQuery()
+    }
+}
+
+const syncPaginationQuery = () => {
+    const query: Record<string, any> = {
+        ...route.query,
+        page: String(currentPage.value),
+        page_size: String(pageSize.value)
+    }
+    if (selectedProject.value) {
+        query.project_id = String(selectedProject.value)
+    } else {
+        delete query.project_id
+    }
+    router.replace({ query })
+}
+
 const handleProjectChange = () => {
     // Reset active tag
     activeTag.value = '全部'
-    // Update URL query
-    const query = selectedProject.value ? { ...route.query, project_id: selectedProject.value } : { ...route.query }
-    if (!selectedProject.value) delete query.project_id
-    
-    router.replace({ query })
-    fetchWorkflows()
+    refreshFromFirstPage()
 }
 
 const changeTag = (tag: string) => {
     activeTag.value = tag
-    fetchWorkflows()
+    refreshFromFirstPage()
 }
 
 const resetFilters = () => {
     selectedProject.value = ''
     activeTag.value = '全部'
-    handleProjectChange()
+    refreshFromFirstPage()
 }
 
 onMounted(async () => {
+    syncPaginationQuery()
     await fetchProjects()
     await fetchWorkflows()
 })
@@ -236,8 +304,8 @@ const deleteWorkflow = async (id: number) => {
     }
     try {
         await axios.delete(`/api/workflows/${id}/`)
-        // Remove from local list
-        workflows.value = workflows.value.filter(w => w.id !== id)
+        adjustPageAfterMutation(1)
+        fetchWorkflows()
     } catch (e) {
         console.error('Failed to delete workflow:', e)
         alert('删除失败，请重试')

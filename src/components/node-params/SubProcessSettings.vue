@@ -39,6 +39,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
+import { fetchAllPages } from '../../utils/pagination'
 
 interface Workflow {
     id: string | number
@@ -70,8 +71,7 @@ const loading = ref(false)
 const fetchWorkflows = async () => {
     loading.value = true
     try {
-        const resp = await axios.get('/api/workflows/')
-        workflows.value = resp.data.results || resp.data || []
+        workflows.value = await fetchAllPages('/api/workflows/')
     } catch (e) {
         console.error("Failed to fetch workflows", e)
     } finally {
