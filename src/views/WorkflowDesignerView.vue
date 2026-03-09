@@ -149,6 +149,44 @@
                       未配置标签
                   </div>
               </div>
+
+              <div class="space-y-2 border border-gray-200 rounded-lg p-3 bg-gray-50/60">
+                  <div class="flex items-center justify-between">
+                      <label class="text-xs font-medium text-gray-600">可见性配置</label>
+                      <span class="text-[11px] text-gray-400">未配置时项目全员可见</span>
+                  </div>
+
+                  <div class="space-y-1">
+                      <label class="text-xs font-medium text-gray-500">允许角色组</label>
+                      <div class="grid grid-cols-2 gap-2">
+                          <label
+                            v-for="role in visibilityRoleOptions"
+                            :key="role"
+                            class="flex items-center gap-2 text-xs text-gray-700 border border-gray-200 rounded px-2 py-1.5 bg-white hover:border-blue-300 cursor-pointer"
+                          >
+                              <input
+                                type="checkbox"
+                                :checked="visibleRoles.includes(role)"
+                                @change="toggleVisibleRole(role)"
+                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span>{{ getRoleLabel(role) }}</span>
+                          </label>
+                      </div>
+                  </div>
+
+                  <div class="space-y-1">
+                      <label class="text-xs font-medium text-gray-500">指定成员</label>
+                      <div v-if="!selectedProjectId" class="text-xs text-gray-400">请先选择项目</div>
+                      <div v-else>
+                          <UserMultiSelect v-model="visibleUserIds" :project-id="selectedProjectId" />
+                      </div>
+                  </div>
+
+                  <p class="text-[11px] text-gray-500 leading-relaxed">
+                      命中任一角色组或被指定成员即可访问；项目 Owner 与工作流创建者始终可见。
+                  </p>
+              </div>
               
               <!-- Notification Template -->
               <div class="space-y-1">
@@ -449,6 +487,31 @@
                         <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
                     </select>
                 </div>
+                <div class="space-y-2 border border-gray-200 rounded-md p-3 bg-gray-50">
+                    <label class="block text-xs font-medium text-gray-600">可见性配置（可选）</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label
+                          v-for="role in visibilityRoleOptions"
+                          :key="'save-modal-' + role"
+                          class="flex items-center gap-2 text-xs text-gray-700 border border-gray-200 rounded px-2 py-1 bg-white cursor-pointer"
+                        >
+                            <input
+                              type="checkbox"
+                              :checked="visibleRoles.includes(role)"
+                              @change="toggleVisibleRole(role)"
+                              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>{{ getRoleLabel(role) }}</span>
+                        </label>
+                    </div>
+                    <div>
+                        <div v-if="!selectedProjectId" class="text-xs text-gray-400">请先选择项目</div>
+                        <UserMultiSelect v-else v-model="visibleUserIds" :project-id="selectedProjectId" />
+                    </div>
+                    <p class="text-[11px] text-gray-500">
+                        不配置时项目成员全员可见；命中任一角色或指定成员即可访问。
+                    </p>
+                </div>
                 <div class="flex justify-end space-x-3 mt-6">
                     <button @click="showSaveModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
                         取消
@@ -473,6 +536,7 @@ import { useRoute, useRouter } from 'vue-router'
 import FlowCanvas from '../components/FlowCanvas.vue'
 import NodeConfiguration from '../components/NodeConfiguration.vue'
 import EdgeConfiguration from '../components/EdgeConfiguration.vue'
+import UserMultiSelect from '../components/node-params/inputs/UserMultiSelect.vue'
 import { Save, Play, Info, Globe, Code, History, Edit3, X, Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
 import { buildPipelineTree, validatePipelineTree, type BuildPipelineOptions, type ParamDefinition } from '../utils/pipelineTreeBuilder'
@@ -505,6 +569,11 @@ const workflowTags = ref<string[]>([])
 const newTag = ref('')
 const selectedProjectId = ref<number | string>('')
 const projects = ref<{id: number, name: string}[]>([])
+const projectMembers = ref<Array<{ user: number; username: string; role: string }>>([])
+const loadingProjectMembers = ref(false)
+const visibilityRoleOptions = ['OWNER', 'MAINTAINER', 'DEVELOPER', 'REPORTER'] as const
+const visibleRoles = ref<string[]>([])
+const visibleUserIds = ref<number[]>([])
 const isLoading = ref(false)
 const notifyTemplate = ref('')
 const showTemplateModal = ref(false)
@@ -533,6 +602,51 @@ const loadingProjectParams = ref(false)
 const enabledGlobalParams = ref<string[]>([])
 
 const availableTags = ref<string[]>([])
+
+const roleLabelMap: Record<string, string> = {
+    OWNER: 'Owner',
+    MAINTAINER: 'Maintainer',
+    DEVELOPER: 'Developer',
+    REPORTER: 'Reporter',
+}
+
+const getRoleLabel = (role: string) => roleLabelMap[role] || role
+
+const toggleVisibleRole = (role: string) => {
+    const idx = visibleRoles.value.indexOf(role)
+    if (idx >= 0) {
+        visibleRoles.value.splice(idx, 1)
+    } else {
+        visibleRoles.value.push(role)
+    }
+}
+
+const fetchProjectMembers = async () => {
+    if (!selectedProjectId.value) {
+        projectMembers.value = []
+        visibleUserIds.value = []
+        return
+    }
+
+    loadingProjectMembers.value = true
+    try {
+        const resp = await axios.get(`/api/projects/members/?project_id=${selectedProjectId.value}`)
+        const data = resp.data.results || resp.data || []
+        projectMembers.value = data.map((m: any) => ({
+            user: m.user,
+            username: m.username,
+            role: m.role
+        }))
+        const validIds = new Set(projectMembers.value.map((m) => m.user))
+        visibleUserIds.value = visibleUserIds.value.filter((id) => validIds.has(id))
+    } catch (e) {
+        console.error('Failed to fetch project members', e)
+        projectMembers.value = []
+        visibleUserIds.value = []
+    } finally {
+        loadingProjectMembers.value = false
+    }
+}
 
 const fetchProjectParams = async () => {
     if (!selectedProjectId.value) {
@@ -576,6 +690,7 @@ watch(activePanel, (newVal) => {
     }
 })
 watch(selectedProjectId, () => {
+    fetchProjectMembers()
     if (activePanel.value === 'vars' || activePanel.value === 'info') {
         fetchProjectParams()
     }
@@ -806,7 +921,9 @@ const handleSave = async (): Promise<boolean> => {
             project: selectedProjectId.value || null,
             graph_data: graphDataJSON,
             pipeline_tree: pipelineTree,
-            notify_template: notifyTemplate.value
+            notify_template: notifyTemplate.value,
+            visible_roles: visibleRoles.value,
+            visible_user_ids: visibleUserIds.value
         }
         
         // Use PATCH for existing workflows, POST for new ones
@@ -847,6 +964,8 @@ const loadWorkflow = async (id: string, isClone = false) => {
              selectedProjectId.value = workflow.project || ''
         }
         notifyTemplate.value = workflow.notify_template || ''
+        visibleRoles.value = workflow.visible_roles || []
+        visibleUserIds.value = workflow.visible_user_ids || []
 
         graphData.value = workflow.graph_data || {}
         
@@ -902,6 +1021,7 @@ const handleCreateTask = async () => {
 
 onMounted(async () => {
     fetchProjects()
+    fetchProjectMembers()
     
     // Check if editing an existing workflow or cloning
     const id = route.params.id as string
@@ -912,6 +1032,11 @@ onMounted(async () => {
     } else if (cloneFrom) {
         // Clone mode: load original data but treat as new
         await loadWorkflow(cloneFrom, true)
+    } else {
+        const defaultProjectId = route.query.project_id as string | undefined
+        if (defaultProjectId) {
+            selectedProjectId.value = defaultProjectId
+        }
     }
 })
 </script>
