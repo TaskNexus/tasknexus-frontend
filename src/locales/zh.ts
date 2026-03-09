@@ -18,6 +18,7 @@ export default {
         projects: '项目管理',
         workflows: '流程管理',
         tasks: '任务中心',
+        tickets: '工单',
         taskRecords: '任务记录',
         periodicTasks: '周期任务',
         scheduledTasks: '计划任务',
@@ -79,4 +80,3 @@ export default {
         deleteWarning: '确定要删除 Agent "{name}" 吗？此操作无法撤销。'
     }
 }
-

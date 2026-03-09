@@ -124,6 +124,7 @@ import {
   LayoutDashboard, 
   FolderKanban, 
   Workflow, 
+  Ticket,
   CheckSquare, 
   Search, 
   LogOut,
@@ -160,6 +161,7 @@ const navItems = computed(() => {
   { name: t('nav.aiChat'), to: '/chat', routeName: 'ai-chat', icon: MessageSquare },
   { name: t('nav.projects'), to: '/projects', routeName: 'projects', icon: FolderKanban },
   { name: t('nav.workflows'), to: '/workflows', routeName: 'workflows', icon: Workflow },
+  { name: t('nav.tickets'), to: '/tickets', routeName: 'tickets', icon: Ticket },
   { 
       name: t('nav.tasks'),
       icon: CheckSquare,

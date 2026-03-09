@@ -50,6 +50,11 @@ const router = createRouter({
           component: () => import('../views/WebhookTaskListView.vue')
         },
         {
+          path: 'tickets',
+          name: 'tickets',
+          component: () => import('../views/TicketListView.vue')
+        },
+        {
           path: 'tasks/create/:workflowId?',
           name: 'task-create',
           component: () => import('../views/TaskCreateView.vue')

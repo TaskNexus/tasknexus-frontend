@@ -8,6 +8,7 @@ export default {
         projects: 'Projects',
         workflows: 'Workflows',
         tasks: 'Tasks',
+        tickets: 'Tickets',
         taskRecords: 'Task Records',
         periodicTasks: 'Periodic Tasks',
         scheduledTasks: 'Scheduled Tasks',
@@ -69,4 +70,3 @@ export default {
         deleteWarning: 'Are you sure you want to delete agent "{name}"? This action cannot be undone.'
     }
 }
-

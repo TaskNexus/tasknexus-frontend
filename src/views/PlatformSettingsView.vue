@@ -602,6 +602,10 @@ const DEFAULT_MATRIX: Record<string, string> = {
   'task.operate_all':      'MAINTAINER',
   'task.delete_own':       'REPORTER',
   'task.delete_all':       'MAINTAINER',
+  'ticket.view':           'REPORTER',
+  'ticket.create':         'REPORTER',
+  'ticket.assign':         'MAINTAINER',
+  'ticket.delete':         'MAINTAINER',
   'component.view':        'REPORTER',
   'component.edit':        'MAINTAINER',
   'agent.chat':            'OWNER',
@@ -638,6 +642,12 @@ const permissionGroups = [
     { key: 'task.operate_all', label: '操作/编辑/启停', description: '所有' },
     { key: 'task.delete_own', label: '删除任务', description: '仅自己的' },
     { key: 'task.delete_all', label: '删除任务', description: '所有' },
+  ]},
+  { name: '工单', permissions: [
+    { key: 'ticket.view', label: '查看工单' },
+    { key: 'ticket.create', label: '创建工单' },
+    { key: 'ticket.assign', label: '指派工单' },
+    { key: 'ticket.delete', label: '删除工单' },
   ]},
   { name: '组件 / AI', permissions: [
     { key: 'component.view', label: '查看组件' },
