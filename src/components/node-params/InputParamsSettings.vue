@@ -1,12 +1,12 @@
 <template>
     <section v-if="inputs && inputs.length > 0" class="space-y-3">
         <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">{{ $t('language.inputParams') }}</h4>
-        
+
         <div v-for="input in inputs" :key="input.key" class="space-y-1">
             <label class="text-xs font-medium text-gray-600">
                 {{ input.name }} <span v-if="input.required" class="text-red-500">*</span>
             </label>
-            
+
             <!-- Model Group Select -->
             <ModelGroupSelect
                 v-if="input.key === 'model_group'"
@@ -23,13 +23,6 @@
                 :disabled="!values['model_group']"
                 @update:model-value="(val) => updateValue(input.key, val)"
             />
-            
-            <!-- Integer Input -->
-            <DefaultTextInput 
-                v-else-if="input.type === 'int' || input.type === 'string'"
-                :model-value="values[input.key] || ''"
-                @update:model-value="(val) => updateValue(input.key, val)"
-            />
 
             <!-- User IDs Multi-select (based on schema.param_type) -->
             <UserMultiSelect
@@ -40,13 +33,27 @@
             />
 
             <!-- String Textarea -->
-            <StringTextarea 
+            <StringTextarea
                 v-else-if="input.schema?.param_type === 'textarea'"
                 :model-value="values[input.key] || ''"
                 placeholder="Enter text content ..."
                 @update:model-value="(val) => updateValue(input.key, val)"
             />
-            
+
+            <!-- Key-Value Pairs -->
+            <KeyValueInput
+                v-else-if="input.schema?.param_type === 'key_values'"
+                :model-value="values[input.key] || []"
+                @update:model-value="(val) => updateValue(input.key, val)"
+            />
+
+            <!-- Integer / String Input -->
+            <DefaultTextInput
+                v-else-if="input.type === 'int' || input.type === 'string'"
+                :model-value="values[input.key] || ''"
+                @update:model-value="(val) => updateValue(input.key, val)"
+            />
+
             <!-- Array of Objects -->
             <ObjectArrayInput
                 v-else-if="input.type === 'array'"
@@ -64,7 +71,7 @@
             />
 
             <!-- Default Input -->
-            <DefaultTextInput 
+            <DefaultTextInput
                 v-else
                 :model-value="values[input.key] || ''"
                 @update:model-value="(val) => updateValue(input.key, val)"
@@ -79,6 +86,7 @@ import {
     ModelGroupSelect,
     ModelNameSelect,
     UserMultiSelect,
+    KeyValueInput,
     StringTextarea,
     BooleanCheckbox,
     DefaultTextInput,

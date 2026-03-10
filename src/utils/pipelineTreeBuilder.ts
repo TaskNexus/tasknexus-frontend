@@ -126,9 +126,23 @@ export function buildPipelineTree(graph: Graph, options?: BuildPipelineOptions):
     // Pre-scan valid node IDs to ensure edges connect to existing nodes
     const validNodeIds = new Set(nodes.map(n => n.id))
 
+    // Helper to detect splice template in nested values (string / array / object)
+    const containsSpliceTemplate = (value: any): boolean => {
+        if (typeof value === 'string') {
+            return /\$\{[^}]+\}/.test(value)
+        }
+        if (Array.isArray(value)) {
+            return value.some(item => containsSpliceTemplate(item))
+        }
+        if (value && typeof value === 'object') {
+            return Object.values(value).some(item => containsSpliceTemplate(item))
+        }
+        return false
+    }
+
     // Helper to determine variable type
     const getVariableInfo = (value: any) => {
-        if (typeof value === 'string' && value.includes('${')) {
+        if (containsSpliceTemplate(value)) {
             return {
                 type: 'splice',
                 value: value
