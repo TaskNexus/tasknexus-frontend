@@ -205,7 +205,39 @@
           
 
           <!-- Content: Global Variables -->
-          <div v-else-if="activePanel === 'vars'" class="flex-1 p-4 overflow-y-auto">
+          <div v-else-if="activePanel === 'vars'" class="flex-1 flex flex-col min-h-0">
+              <div class="px-4 pt-3">
+                  <div class="flex items-center gap-2 p-1 bg-gray-100 rounded-md">
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs rounded transition-colors"
+                        :class="varsSubPage === 'global' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'"
+                        @click="varsSubPage = 'global'"
+                      >
+                          全局变量
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs rounded transition-colors"
+                        :class="varsSubPage === 'workflow-list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'"
+                        @click="varsSubPage = 'workflow-list'"
+                      >
+                          流程参数
+                      </button>
+                      <button
+                        v-if="currentWorkflowParam"
+                        type="button"
+                        class="px-3 py-1.5 text-xs rounded transition-colors"
+                        :class="varsSubPage === 'workflow-detail' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'"
+                        @click="varsSubPage = 'workflow-detail'"
+                      >
+                          参数详情
+                      </button>
+                  </div>
+              </div>
+
+              <div class="flex-1 p-4 overflow-y-auto">
+                  <template v-if="varsSubPage === 'global'">
               <div v-if="!selectedProjectId" class="text-sm text-gray-400 text-center py-4">
                   请先选择项目以查看可用参数
               </div>
@@ -302,50 +334,208 @@
               <div class="border-t border-gray-200 my-4"></div>
               
               <!-- Workflow Specific Params -->
+              </template>
+
+              <template v-else-if="varsSubPage === 'workflow-list'">
               <div>
                   <div class="flex items-center justify-between mb-2">
                       <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">流程变量</h4>
                       <button @click="addWorkflowParam" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded transition-colors">
-                          + Add
+                          + 新增
                       </button>
                   </div>
-                  <p class="text-xs text-gray-500 mb-3">Define parameters specific to this workflow. These override project defaults.</p>
-                  
+                  <p class="text-xs text-gray-500 mb-3">主列表仅显示参数名称，点击后在详情页编辑类型、默认值与描述。</p>
+
                   <div v-if="workflowParams.length === 0" class="text-center py-4 bg-gray-50 rounded border border-dashed border-gray-200">
-                      <span class="text-xs text-gray-400">No workflow-specific parameters</span>
+                      <span class="text-xs text-gray-400">暂无流程参数</span>
                   </div>
-                  
-                  <div v-else class="space-y-3">
-                      <div v-for="(param, index) in workflowParams" :key="index" class="p-2 rounded border border-gray-200 bg-white hover:border-blue-300 transition-colors">
-                          <div class="space-y-2">
-                              <div>
-                                  <input 
-                                      v-model="param.key" 
-                                      placeholder="Key (e.g. TIMEOUT)" 
-                                      class="w-full text-xs font-medium border-gray-200 rounded px-2 py-1 focus:border-blue-500 focus:outline-none bg-gray-50 focus:bg-white"
+
+                  <div v-else class="space-y-2">
+                      <div
+                        v-for="(param, index) in workflowParams"
+                        :key="index"
+                        class="flex items-center gap-2"
+                      >
+                          <button
+                            type="button"
+                            class="flex-1 text-left rounded border px-2 py-1.5 text-xs transition-colors"
+                            :class="selectedWorkflowParamIndex === index ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white hover:border-blue-300'"
+                            @click="openWorkflowParamDetail(index)"
+                          >
+                              <span class="font-mono">{{ getWorkflowParamDisplayName(param, index) }}</span>
+                          </button>
+                          <button @click="removeWorkflowParam(index)" class="text-gray-400 hover:text-red-500">
+                              <X class="w-3 h-3" />
+                          </button>
+                      </div>
+                  </div>
+              </div>
+              </template>
+
+              <template v-else>
+              <div v-if="currentWorkflowParam" class="space-y-3">
+                  <div class="flex items-center justify-between">
+                      <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">参数详情</h4>
+                      <button type="button" class="text-xs text-blue-600 hover:text-blue-700" @click="closeWorkflowParamDetail">
+                          返回参数列表
+                      </button>
+                  </div>
+
+                  <div class="space-y-1">
+                      <label class="text-[11px] font-medium text-gray-500">参数名称</label>
+                      <input
+                        v-model="currentWorkflowParam.key"
+                        placeholder="例如：target_branch"
+                        class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                      />
+                  </div>
+
+                  <div class="space-y-1">
+                      <label class="text-[11px] font-medium text-gray-500">参数类型</label>
+                      <select
+                        v-model="currentWorkflowParam.input_type"
+                        class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none bg-white"
+                        @change="onWorkflowParamTypeChange(currentWorkflowParam)"
+                      >
+                          <option v-for="item in workflowParamTypes" :key="item.value" :value="item.value">
+                              {{ item.label }}
+                          </option>
+                      </select>
+                  </div>
+
+                  <div class="space-y-1">
+                      <label class="text-[11px] font-medium text-gray-500">描述</label>
+                      <textarea
+                        v-model="currentWorkflowParam.description"
+                        rows="2"
+                        placeholder="参数用途说明（可选）"
+                        class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                      ></textarea>
+                  </div>
+
+                  <template v-if="currentWorkflowParam.input_type === 'git-branch'">
+                      <div class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">仓库地址</label>
+                          <input
+                            v-model="currentWorkflowParam.git_branch.repo_url"
+                            placeholder="https://github.com/org/repo 或 https://gitlab.example.com/group/repo"
+                            class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                          />
+                      </div>
+                      <div class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">仓库 Token</label>
+                          <input
+                            v-model="currentWorkflowParam.git_branch.token"
+                            type="password"
+                            placeholder="用于拉取分支列表"
+                            class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                          />
+                      </div>
+                      <div class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">默认值（分支）</label>
+                          <input
+                            v-model="currentWorkflowParam.value"
+                            placeholder="例如：main"
+                            class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                          />
+                      </div>
+                  </template>
+
+                  <template v-else-if="currentWorkflowParam.input_type === 'single-select' || currentWorkflowParam.input_type === 'multi-select'">
+                      <div class="space-y-2">
+                          <div class="flex items-center justify-between">
+                              <label class="text-[11px] font-medium text-gray-500">选项</label>
+                              <button
+                                type="button"
+                                class="text-[11px] text-blue-600 hover:text-blue-700"
+                                @click="addWorkflowParamOption(currentWorkflowParam)"
+                              >
+                                  + 新增选项
+                              </button>
+                          </div>
+                          <div v-if="currentWorkflowParam.options.length === 0" class="text-[11px] text-orange-500">
+                              请至少添加一个选项
+                          </div>
+                          <div v-else class="space-y-2">
+                              <div
+                                v-for="(opt, optIndex) in currentWorkflowParam.options"
+                                :key="optIndex"
+                                class="grid grid-cols-[1fr_1fr_auto] gap-2 items-center"
+                              >
+                                  <input
+                                    v-model="opt.value"
+                                    placeholder="value"
+                                    class="text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
                                   />
-                              </div>
-                              <div>
-                                  <input 
-                                      v-model="param.value" 
-                                      placeholder="Value" 
-                                      class="w-full text-xs border-gray-200 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                                  <input
+                                    v-model="opt.label"
+                                    placeholder="显示值"
+                                    class="text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
                                   />
-                              </div>
-                              <div class="flex items-center gap-2">
-                                  <input 
-                                      v-model="param.description" 
-                                      placeholder="Description (Optional)" 
-                                      class="flex-1 text-xs text-gray-500 border-transparent bg-transparent focus:border-gray-200 rounded px-1 py-0.5 focus:bg-white"
-                                  />
-                                  <button @click="removeWorkflowParam(index)" class="text-gray-400 hover:text-red-500">
+                                  <button
+                                    type="button"
+                                    class="text-gray-400 hover:text-red-500"
+                                    @click="removeWorkflowParamOption(currentWorkflowParam, optIndex)"
+                                  >
                                       <X class="w-3 h-3" />
                                   </button>
                               </div>
                           </div>
                       </div>
-                  </div>
+
+                      <div v-if="currentWorkflowParam.input_type === 'single-select'" class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">默认值</label>
+                          <select
+                            v-model="currentWorkflowParam.value"
+                            class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none bg-white"
+                          >
+                              <option value="">请选择默认值</option>
+                              <option
+                                v-for="(opt, optIndex) in currentWorkflowParam.options"
+                                :key="`single-${optIndex}`"
+                                :value="opt.value"
+                              >
+                                  {{ opt.label || opt.value }}
+                              </option>
+                          </select>
+                      </div>
+
+                      <div v-else class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">默认值（可多选）</label>
+                          <div class="space-y-1">
+                              <label
+                                v-for="(opt, optIndex) in currentWorkflowParam.options"
+                                :key="`multi-${optIndex}`"
+                                class="flex items-center gap-2 text-xs text-gray-700"
+                              >
+                                  <input
+                                    type="checkbox"
+                                    :checked="isMultiDefaultSelected(currentWorkflowParam, opt.value)"
+                                    @change="toggleMultiDefaultValue(currentWorkflowParam, opt.value)"
+                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span>{{ opt.label || opt.value }}</span>
+                              </label>
+                          </div>
+                      </div>
+                  </template>
+
+                  <template v-else>
+                      <div class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">默认值</label>
+                          <input
+                            v-model="currentWorkflowParam.value"
+                            placeholder="默认值"
+                            class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                          />
+                      </div>
+                  </template>
               </div>
+              <div v-else class="text-sm text-gray-400 text-center py-8 bg-gray-50 rounded border border-dashed border-gray-200">
+                  请先在流程参数页选择一个参数
+              </div>
+              </template>
+          </div>
           </div>
           
           <!-- Content: JSON -->
@@ -531,7 +721,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick, watch } from 'vue'
+import { ref, reactive, onMounted, nextTick, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FlowCanvas from '../components/FlowCanvas.vue'
 import NodeConfiguration from '../components/NodeConfiguration.vue'
@@ -600,6 +790,8 @@ interface ProjectParam {
 const projectParams = ref<ProjectParam[]>([])
 const loadingProjectParams = ref(false)
 const enabledGlobalParams = ref<string[]>([])
+type VarsSubPage = 'global' | 'workflow-list' | 'workflow-detail'
+const varsSubPage = ref<VarsSubPage>('global')
 
 const availableTags = ref<string[]>([])
 
@@ -678,11 +870,14 @@ const fetchProjectParams = async () => {
 
 // Watch activePanel to load params when 'vars' opens.
 // Also watch selectedProjectId.
-watch(activePanel, (newVal) => {
+watch(activePanel, (newVal, oldVal) => {
     if (newVal === 'vars' || newVal === 'info') {
         fetchProjectParams()
     }
     if (newVal === 'vars') {
+        if (oldVal !== 'vars') {
+            varsSubPage.value = 'global'
+        }
         // Wait for graph to be ready/loaded before checking
         nextTick(() => {
             refreshComponentVars()
@@ -710,23 +905,180 @@ const toggleParam = (key: string) => {
 }
 
 // Workflow Local Params State
+type WorkflowParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select'
+
+interface WorkflowParamOption {
+    value: string
+    label: string
+}
+
+interface WorkflowParamGitBranchConfig {
+    repo_url: string
+    token: string
+}
+
 interface WorkflowParam {
     key: string
-    value: string
+    value: any
     description: string
+    input_type: WorkflowParamInputType
+    options: WorkflowParamOption[]
+    git_branch: WorkflowParamGitBranchConfig
 }
+
+const workflowParamTypes: Array<{ value: WorkflowParamInputType; label: string }> = [
+    { value: 'text', label: '文本' },
+    { value: 'git-branch', label: 'Git 分支' },
+    { value: 'single-select', label: '单选' },
+    { value: 'multi-select', label: '多选' },
+]
+
+const createDefaultWorkflowParam = (): WorkflowParam => ({
+    key: '',
+    value: '',
+    description: '',
+    input_type: 'text',
+    options: [],
+    git_branch: {
+        repo_url: '',
+        token: '',
+    },
+})
+
+const normalizeWorkflowParam = (raw: any): WorkflowParam => {
+    const normalizedType: WorkflowParamInputType = workflowParamTypes.some((x) => x.value === raw?.input_type)
+        ? raw.input_type
+        : 'text'
+
+    const options: WorkflowParamOption[] = Array.isArray(raw?.options)
+        ? raw.options.map((opt: any) => ({
+            value: String(opt?.value ?? '').trim(),
+            label: String(opt?.label ?? opt?.value ?? '').trim(),
+        }))
+        : []
+
+    let normalizedValue: any = raw?.value ?? ''
+    if (normalizedType === 'multi-select') {
+        normalizedValue = Array.isArray(raw?.value) ? raw.value.map((v: any) => String(v)) : []
+    } else {
+        normalizedValue = String(raw?.value ?? '')
+    }
+
+    return {
+        key: String(raw?.key ?? ''),
+        value: normalizedValue,
+        description: String(raw?.description ?? ''),
+        input_type: normalizedType,
+        options,
+        git_branch: {
+            repo_url: String(raw?.git_branch?.repo_url ?? ''),
+            token: String(raw?.git_branch?.token ?? ''),
+        },
+    }
+}
+
 const workflowParams = ref<WorkflowParam[]>([])
+const selectedWorkflowParamIndex = ref<number | null>(null)
+
+const currentWorkflowParam = computed<WorkflowParam | null>(() => {
+    if (selectedWorkflowParamIndex.value === null) {
+        return null
+    }
+    return workflowParams.value[selectedWorkflowParamIndex.value] || null
+})
+
+const getWorkflowParamDisplayName = (param: WorkflowParam, index: number) => {
+    const key = String(param.key || '').trim()
+    return key || `param_${index + 1}`
+}
+
+const openWorkflowParamDetail = (index: number) => {
+    selectedWorkflowParamIndex.value = index
+    varsSubPage.value = 'workflow-detail'
+}
+
+const closeWorkflowParamDetail = () => {
+    selectedWorkflowParamIndex.value = null
+    varsSubPage.value = 'workflow-list'
+}
+
+const onWorkflowParamTypeChange = (param: WorkflowParam) => {
+    if (!param.git_branch) {
+        param.git_branch = { repo_url: '', token: '' }
+    }
+    if (!Array.isArray(param.options)) {
+        param.options = []
+    }
+
+    if (param.input_type === 'multi-select') {
+        if (!Array.isArray(param.value)) {
+            param.value = []
+        }
+        const validValues = new Set(param.options.map((opt) => String(opt.value || '').trim()).filter(Boolean))
+        param.value = param.value.map((v: any) => String(v)).filter((v: string) => validValues.has(v))
+        return
+    }
+
+    if (Array.isArray(param.value)) {
+        param.value = ''
+    } else {
+        param.value = String(param.value ?? '')
+    }
+
+    if (param.input_type === 'single-select' && param.value) {
+        const validValues = new Set(param.options.map((opt) => String(opt.value || '').trim()).filter(Boolean))
+        if (!validValues.has(param.value)) {
+            param.value = ''
+        }
+    }
+}
+
+const addWorkflowParamOption = (param: WorkflowParam) => {
+    param.options.push({
+        value: '',
+        label: '',
+    })
+}
+
+const removeWorkflowParamOption = (param: WorkflowParam, index: number) => {
+    param.options.splice(index, 1)
+    onWorkflowParamTypeChange(param)
+}
+
+const isMultiDefaultSelected = (param: WorkflowParam, value: string) => {
+    return Array.isArray(param.value) && param.value.includes(value)
+}
+
+const toggleMultiDefaultValue = (param: WorkflowParam, value: string) => {
+    const arr = Array.isArray(param.value) ? [...param.value] : []
+    const idx = arr.indexOf(value)
+    if (idx >= 0) {
+        arr.splice(idx, 1)
+    } else {
+        arr.push(value)
+    }
+    param.value = arr
+}
 
 const addWorkflowParam = () => {
-    workflowParams.value.push({
-        key: '',
-        value: '',
-        description: ''
-    })
+    workflowParams.value.push(createDefaultWorkflowParam())
+    selectedWorkflowParamIndex.value = workflowParams.value.length - 1
+    varsSubPage.value = 'workflow-detail'
 }
 
 const removeWorkflowParam = (index: number) => {
     workflowParams.value.splice(index, 1)
+    if (selectedWorkflowParamIndex.value === null) {
+        return
+    }
+    if (selectedWorkflowParamIndex.value === index) {
+        selectedWorkflowParamIndex.value = null
+        if (varsSubPage.value === 'workflow-detail') {
+            varsSubPage.value = 'workflow-list'
+        }
+    } else if (selectedWorkflowParamIndex.value > index) {
+        selectedWorkflowParamIndex.value -= 1
+    }
 }
 
 // Save state
@@ -870,11 +1222,107 @@ const handleSaveClick = () => {
     }
 }
 
+const normalizeWorkflowParamsForSave = (): WorkflowParam[] => {
+    return workflowParams.value.map((raw) => {
+        const param = normalizeWorkflowParam(raw)
+        param.key = param.key.trim()
+        param.description = param.description.trim()
+        param.options = param.options
+            .map((opt) => ({
+                value: String(opt.value || '').trim(),
+                label: String(opt.label || opt.value || '').trim(),
+            }))
+            .filter((opt) => !!opt.value)
+        param.git_branch = {
+            repo_url: String(param.git_branch?.repo_url || '').trim(),
+            token: String(param.git_branch?.token || '').trim(),
+        }
+
+        if (param.input_type === 'multi-select') {
+            const validValues = new Set(param.options.map((opt) => opt.value))
+            const values = Array.isArray(param.value) ? param.value.map((v: any) => String(v)) : []
+            param.value = values.filter((v: string) => validValues.has(v))
+        } else {
+            param.value = String(param.value ?? '')
+            if (param.input_type === 'single-select') {
+                const validValues = new Set(param.options.map((opt) => opt.value))
+                if (param.value && !validValues.has(param.value)) {
+                    param.value = ''
+                }
+            }
+        }
+        return param
+    })
+}
+
+const validateWorkflowParamsForSave = (params: WorkflowParam[]): string[] => {
+    const errors: string[] = []
+    const seen = new Set<string>()
+
+    params.forEach((param, index) => {
+        const label = `流程参数 #${index + 1}`
+
+        if (!param.key) {
+            errors.push(`${label} 未填写参数名称`)
+            return
+        }
+        if (seen.has(param.key)) {
+            errors.push(`${label} 与其他参数重名：${param.key}`)
+            return
+        }
+        seen.add(param.key)
+
+        if (param.input_type === 'single-select' || param.input_type === 'multi-select') {
+            if (!param.options.length) {
+                errors.push(`${label}（${param.key}）至少需要一个选项`)
+                return
+            }
+            const optionValues = param.options.map((opt) => opt.value)
+            const optionValueSet = new Set(optionValues)
+            if (optionValueSet.size !== optionValues.length) {
+                errors.push(`${label}（${param.key}）存在重复选项值`)
+            }
+
+            if (param.input_type === 'single-select') {
+                const value = String(param.value || '')
+                if (value && !optionValueSet.has(value)) {
+                    errors.push(`${label}（${param.key}）默认值不在选项中`)
+                }
+            } else {
+                const values = Array.isArray(param.value) ? param.value.map((v) => String(v)) : []
+                const invalidValues = values.filter((v) => !optionValueSet.has(v))
+                if (invalidValues.length) {
+                    errors.push(`${label}（${param.key}）多选默认值存在无效选项`)
+                }
+            }
+        }
+
+        if (param.input_type === 'git-branch') {
+            if (!param.git_branch.repo_url) {
+                errors.push(`${label}（${param.key}）缺少仓库地址`)
+            }
+            if (!param.git_branch.token) {
+                errors.push(`${label}（${param.key}）缺少仓库 Token`)
+            }
+        }
+    })
+
+    return errors
+}
+
 const handleSave = async (): Promise<boolean> => {
     if (!workflowName.value) return false
     
     isSaving.value = true
     try {
+        const normalizedWorkflowParams = normalizeWorkflowParamsForSave()
+        const workflowParamErrors = validateWorkflowParamsForSave(normalizedWorkflowParams)
+        if (workflowParamErrors.length > 0) {
+            alert('流程参数配置有误：\n' + workflowParamErrors.join('\n'))
+            return false
+        }
+        workflowParams.value = normalizedWorkflowParams
+
         // Get graph from FlowCanvas
         const graph = flowCanvasRef.value?.getGraph()
         if (!graph) {
@@ -888,7 +1336,7 @@ const handleSave = async (): Promise<boolean> => {
             .map(p => ({ key: p.key, value: p.value }))
         
         // Map workflow params
-        const workflowParamsList: ParamDefinition[] = workflowParams.value
+        const workflowParamsList: ParamDefinition[] = normalizedWorkflowParams
             .filter(p => p.key)
             .map(p => ({ key: p.key, value: p.value }))
         
@@ -913,7 +1361,7 @@ const handleSave = async (): Promise<boolean> => {
         // MERGE global_params_enabled into graphData
         graphDataJSON.global_params_enabled = enabledGlobalParams.value
         // MERGE workflow_params
-        graphDataJSON.workflow_params = workflowParams.value
+        graphDataJSON.workflow_params = normalizedWorkflowParams
 
         const payload = {
             name: workflowName.value,
@@ -977,11 +1425,12 @@ const loadWorkflow = async (id: string, isClone = false) => {
         }
         
         // Load workflow params
-        if (workflow.graph_data && workflow.graph_data.workflow_params) {
-            workflowParams.value = workflow.graph_data.workflow_params
+        if (workflow.graph_data && Array.isArray(workflow.graph_data.workflow_params)) {
+            workflowParams.value = workflow.graph_data.workflow_params.map((p: any) => normalizeWorkflowParam(p))
         } else {
             workflowParams.value = []
         }
+        selectedWorkflowParamIndex.value = null
         
         // Wait for FlowCanvas to be mounted, then load graph
         await nextTick()

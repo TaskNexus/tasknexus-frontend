@@ -160,21 +160,104 @@
                                     <span v-if="param.source === 'global'" class="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded uppercase tracking-wide">Project</span>
                                     <span v-else class="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] rounded uppercase tracking-wide">Workflow</span>
                                 </div>
+                                <span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded">
+                                    {{ paramTypeLabels[param.inputType] || '文本' }}
+                                </span>
                             </div>
                             <p class="text-xs text-gray-500 mt-1">{{ param.description || 'No description provided' }}</p>
                         </div>
                         
                         <!-- Value Input -->
-                        <div class="col-span-8">
-                            <input 
-                            v-model="param.runtimeValue" 
-                            type="text" 
-                            class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm border"
-                            :placeholder="param.value"
-                            />
+                        <div class="col-span-8 space-y-2">
+                            <template v-if="param.inputType === 'single-select'">
+                                <select
+                                  v-if="param.options.length > 0"
+                                  v-model="param.runtimeValue"
+                                  class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm border bg-white"
+                                >
+                                    <option value="">请选择</option>
+                                    <option v-for="(opt, idx) in param.options" :key="`single-${param.key}-${idx}`" :value="opt.value">
+                                        {{ opt.label || opt.value }}
+                                    </option>
+                                </select>
+                                <input
+                                  v-else
+                                  v-model="param.runtimeValue"
+                                  type="text"
+                                  class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm border"
+                                  :placeholder="typeof param.value === 'string' ? param.value : ''"
+                                />
+                            </template>
+
+                            <template v-else-if="param.inputType === 'multi-select'">
+                                <div v-if="param.options.length > 0" class="space-y-1 border border-gray-200 rounded-md p-2 bg-gray-50">
+                                    <label
+                                      v-for="(opt, idx) in param.options"
+                                      :key="`multi-${param.key}-${idx}`"
+                                      class="flex items-center gap-2 text-sm text-gray-700"
+                                    >
+                                        <input
+                                          type="checkbox"
+                                          :value="opt.value"
+                                          :checked="Array.isArray(param.runtimeValue) && param.runtimeValue.includes(opt.value)"
+                                          @change="toggleMultiParamValue(param, opt.value)"
+                                          class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span>{{ opt.label || opt.value }}</span>
+                                    </label>
+                                </div>
+                                <div v-else class="text-xs text-orange-500">未配置可选项，可在流程参数详情页中补充选项。</div>
+                            </template>
+
+                            <template v-else-if="param.inputType === 'git-branch'">
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <select
+                                          v-model="param.runtimeValue"
+                                          class="flex-1 border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm border bg-white"
+                                          :disabled="param.loadingBranches || param.branchOptions.length === 0"
+                                        >
+                                            <option value="">{{ param.loadingBranches ? '加载分支中...' : '请选择分支' }}</option>
+                                            <option
+                                              v-for="(branch, idx) in param.branchOptions"
+                                              :key="`branch-${param.key}-${idx}`"
+                                              :value="branch.name"
+                                            >
+                                                {{ branch.name }}{{ branch.is_default ? ' (default)' : '' }}
+                                            </option>
+                                        </select>
+                                        <button
+                                          type="button"
+                                          @click="refreshGitBranches(param)"
+                                          class="px-3 py-2 text-xs text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-md disabled:opacity-50"
+                                          :disabled="param.loadingBranches"
+                                        >
+                                            <Loader2 v-if="param.loadingBranches" class="w-3 h-3 animate-spin" />
+                                            <span v-else>刷新</span>
+                                        </button>
+                                    </div>
+                                    <input
+                                      v-model="param.runtimeValue"
+                                      type="text"
+                                      class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm border"
+                                      placeholder="可手动输入分支名（接口失败时兜底）"
+                                    />
+                                    <p v-if="param.branchError" class="text-xs text-orange-500">{{ param.branchError }}</p>
+                                </div>
+                            </template>
+
+                            <template v-else>
+                                <input 
+                                  v-model="param.runtimeValue" 
+                                  type="text" 
+                                  class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm border"
+                                  :placeholder="typeof param.value === 'string' ? param.value : ''"
+                                />
+                            </template>
+
                             <div class="flex justify-between mt-1">
-                            <span class="text-xs text-gray-400">Default: {{ param.value }}</span>
-                            <span v-if="param.runtimeValue !== param.value" class="text-xs text-orange-500 font-medium">Modified</span>
+                                <span class="text-xs text-gray-400">Default: {{ formatParamDefaultValue(param) }}</span>
+                                <span v-if="isParamModified(param)" class="text-xs text-orange-500 font-medium">Modified</span>
                             </div>
                         </div>
                 </div>
@@ -438,12 +521,42 @@ const taskTypes = [
     { label: 'Webhook', value: 'webhook' }
 ]
 
+type ParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select'
+
+interface ParamOption {
+    value: string
+    label: string
+}
+
+interface GitBranchConfig {
+    repo_url: string
+    token: string
+}
+
+interface GitBranchOption {
+    name: string
+    is_default: boolean
+}
+
 interface ParamItem {
     key: string
-    value: string // Default value
-    runtimeValue: string // Current input value
+    value: any // Default value
+    runtimeValue: any // Current input value
     description: string
     source: 'global' | 'workflow'
+    inputType: ParamInputType
+    options: ParamOption[]
+    gitBranch: GitBranchConfig | null
+    branchOptions: GitBranchOption[]
+    loadingBranches: boolean
+    branchError: string
+}
+
+const paramTypeLabels: Record<ParamInputType, string> = {
+    text: '文本',
+    'git-branch': 'Git 分支',
+    'single-select': '单选',
+    'multi-select': '多选',
 }
 
 interface FeishuUserOption {
@@ -478,6 +591,189 @@ const isValid = computed(() => {
     
     return true
 })
+
+const normalizeInputType = (inputType: any): ParamInputType => {
+    if (inputType === 'git-branch' || inputType === 'single-select' || inputType === 'multi-select') {
+        return inputType
+    }
+    return 'text'
+}
+
+const normalizeParamOptions = (raw: any): ParamOption[] => {
+    if (!Array.isArray(raw)) return []
+    return raw
+        .map((opt: any) => ({
+            value: String(opt?.value ?? '').trim(),
+            label: String(opt?.label ?? opt?.value ?? '').trim(),
+        }))
+        .filter((opt: ParamOption) => !!opt.value)
+}
+
+const normalizeParamValueByType = (inputType: ParamInputType, value: any, options: ParamOption[]): any => {
+    if (inputType === 'multi-select') {
+        const optionSet = new Set(options.map((opt) => opt.value))
+        let list: string[] = []
+        if (Array.isArray(value)) {
+            list = value.map((v) => String(v))
+        } else if (typeof value === 'string') {
+            const trimmed = value.trim()
+            if (trimmed) {
+                try {
+                    const parsed = JSON.parse(trimmed)
+                    if (Array.isArray(parsed)) {
+                        list = parsed.map((v) => String(v))
+                    } else {
+                        list = trimmed.split(',').map((v) => v.trim()).filter(Boolean)
+                    }
+                } catch {
+                    list = trimmed.split(',').map((v) => v.trim()).filter(Boolean)
+                }
+            }
+        }
+        if (optionSet.size === 0) {
+            return list
+        }
+        return list.filter((v) => optionSet.has(v))
+    }
+
+    const normalized = String(value ?? '')
+    if (inputType === 'single-select' && normalized) {
+        const optionSet = new Set(options.map((opt) => opt.value))
+        if (optionSet.size === 0) {
+            return normalized
+        }
+        return optionSet.has(normalized) ? normalized : ''
+    }
+    return normalized
+}
+
+const buildParamItem = (raw: any, source: 'global' | 'workflow'): ParamItem => {
+    const inputType = source === 'workflow' ? normalizeInputType(raw?.input_type) : 'text'
+    const options = source === 'workflow' ? normalizeParamOptions(raw?.options) : []
+    const defaultValue = normalizeParamValueByType(inputType, raw?.value, options)
+
+    return {
+        key: String(raw?.key ?? ''),
+        value: defaultValue,
+        runtimeValue: Array.isArray(defaultValue) ? [...defaultValue] : defaultValue,
+        description: String(raw?.description ?? ''),
+        source,
+        inputType,
+        options,
+        gitBranch: source === 'workflow' && inputType === 'git-branch'
+            ? {
+                repo_url: String(raw?.git_branch?.repo_url ?? ''),
+                token: String(raw?.git_branch?.token ?? ''),
+            }
+            : null,
+        branchOptions: [],
+        loadingBranches: false,
+        branchError: '',
+    }
+}
+
+const formatParamDefaultValue = (param: ParamItem) => {
+    if (Array.isArray(param.value)) {
+        return param.value.length ? param.value.join(', ') : '[]'
+    }
+    return String(param.value ?? '')
+}
+
+const isParamModified = (param: ParamItem) => {
+    if (Array.isArray(param.value) || Array.isArray(param.runtimeValue)) {
+        const d = Array.isArray(param.value) ? param.value.map((v: any) => String(v)) : []
+        const r = Array.isArray(param.runtimeValue) ? param.runtimeValue.map((v: any) => String(v)) : []
+        if (d.length !== r.length) return true
+        return d.some((v: string, idx: number) => v !== r[idx])
+    }
+    return String(param.runtimeValue ?? '') !== String(param.value ?? '')
+}
+
+const toggleMultiParamValue = (param: ParamItem, value: string) => {
+    const current = Array.isArray(param.runtimeValue) ? [...param.runtimeValue] : []
+    const idx = current.indexOf(value)
+    if (idx >= 0) {
+        current.splice(idx, 1)
+    } else {
+        current.push(value)
+    }
+    param.runtimeValue = current
+}
+
+const getContextValue = (param: ParamItem) => {
+    if (param.inputType === 'multi-select') {
+        return Array.isArray(param.runtimeValue) ? param.runtimeValue.map((v: any) => String(v)) : []
+    }
+    return String(param.runtimeValue ?? '')
+}
+
+const applyContextToParams = (context: Record<string, any>) => {
+    if (!context || typeof context !== 'object') return
+
+    allParams.value.forEach((param) => {
+        if (Object.prototype.hasOwnProperty.call(context, param.key)) {
+            param.runtimeValue = normalizeParamValueByType(param.inputType, context[param.key], param.options)
+        }
+    })
+}
+
+const refreshGitBranches = async (param: ParamItem) => {
+    if (param.inputType !== 'git-branch') return
+    const repoUrl = String(param.gitBranch?.repo_url || '').trim()
+    const token = String(param.gitBranch?.token || '').trim()
+
+    if (!repoUrl || !token) {
+        param.branchOptions = []
+        param.branchError = '流程参数未配置仓库地址或 Token，请回到流程设计页完善配置。'
+        return
+    }
+
+    param.loadingBranches = true
+    param.branchError = ''
+    try {
+        const { data } = await axios.post('/api/tasks/git-branches/', {
+            repo_url: repoUrl,
+            token,
+        })
+        const branches: GitBranchOption[] = Array.isArray(data?.branches)
+            ? data.branches
+                .map((branch: any) => ({
+                    name: String(branch?.name ?? ''),
+                    is_default: !!branch?.is_default,
+                }))
+                .filter((branch: GitBranchOption) => !!branch.name)
+            : []
+
+        param.branchOptions = branches
+        if (branches.length === 0) {
+            param.branchError = '未获取到分支列表，可手动输入分支名。'
+        }
+
+        const allowed = new Set(branches.map((branch) => branch.name))
+        const currentValue = String(param.runtimeValue ?? '')
+        if (!currentValue) {
+            const defaultBranch = branches.find((branch) => branch.is_default)?.name || ''
+            if (defaultBranch) {
+                param.runtimeValue = defaultBranch
+            }
+        } else if (!allowed.has(currentValue)) {
+            param.branchError = '当前分支不在远端列表中，可继续手动输入。'
+        }
+    } catch {
+        param.branchOptions = []
+        param.branchError = '分支加载失败，可手动输入分支名。'
+    } finally {
+        param.loadingBranches = false
+    }
+}
+
+const refreshGitBranchesForAllParams = () => {
+    allParams.value
+        .filter((param) => param.inputType === 'git-branch')
+        .forEach((param) => {
+            refreshGitBranches(param)
+        })
+}
 
 const getFeishuGroupKey = (name: string) => {
     const normalized = String(name || '').trim()
@@ -741,11 +1037,7 @@ const loadTaskForEdit = async () => {
         
         // Now override params with Saved Context
         const savedContext = data.context || {}
-        allParams.value.forEach(p => {
-             if (p.key in savedContext) {
-                 p.runtimeValue = String(savedContext[p.key])
-             }
-        })
+        applyContextToParams(savedContext)
         
         // Restore notification settings
         if (data.feishu_notify_enabled !== undefined) {
@@ -829,13 +1121,7 @@ const applyReplayContext = async () => {
         
         // Restore context params
         const context = data.context || {}
-        if (context && typeof context === 'object') {
-            allParams.value.forEach(p => {
-                if (p.key in context) {
-                    p.runtimeValue = String(context[p.key])
-                }
-            })
-        }
+        applyContextToParams(context)
         
         // Restore task name
         if (data.name) {
@@ -878,13 +1164,7 @@ const fetchWorkflowDetails = async (id: number) => {
                 
                 globalParams.forEach((p: any) => {
                     if (enabledKeys.includes(p.key)) {
-                        params.push({
-                            key: p.key,
-                            value: String(p.value),
-                            runtimeValue: String(p.value),
-                            description: p.description,
-                            source: 'global'
-                        })
+                        params.push(buildParamItem(p, 'global'))
                     }
                 })
             } catch (err) {
@@ -893,29 +1173,19 @@ const fetchWorkflowDetails = async (id: number) => {
         }
         
         // 2. Workflow
-        const workflowParams = graphData.workflow_params || []
+        const workflowParams = Array.isArray(graphData.workflow_params) ? graphData.workflow_params : []
         workflowParams.forEach((p: any) => {
+             const item = buildParamItem(p, 'workflow')
              const existingIdx = params.findIndex(x => x.key === p.key)
              if (existingIdx !== -1) {
-                 params[existingIdx] = {
-                    key: p.key,
-                    value: String(p.value),
-                    runtimeValue: String(p.value),
-                    description: p.description,
-                    source: 'workflow'
-                 }
+                 params[existingIdx] = item
              } else {
-                 params.push({
-                    key: p.key,
-                    value: String(p.value),
-                    runtimeValue: String(p.value),
-                    description: p.description,
-                    source: 'workflow'
-                 })
+                 params.push(item)
              }
         })
         
         allParams.value = params
+        refreshGitBranchesForAllParams()
         
         // Apply replay context if present
         applyReplayContext()
@@ -935,7 +1205,9 @@ const handleCreateAction = async () => {
         // Collect context
         const context: Record<string, any> = {}
         allParams.value.forEach(p => {
-             context[p.key] = p.runtimeValue
+             if (p.key) {
+                 context[p.key] = getContextValue(p)
+             }
         })
         
         const payload: any = {

@@ -109,7 +109,14 @@
       >
         <div v-if="initialLoading" class="text-gray-400 animate-pulse">Loading logs...</div>
         <template v-else>
-          <div :style="{ height: `${topVirtualSpacerPx}px` }"></div>
+          <div :style="{ height: `${renderedTopSpacerPx}px` }"></div>
+
+          <div
+            v-if="isRelocatingWindow"
+            class="py-2 text-xs text-gray-400"
+          >
+            正在定位该位置附近的日志...
+          </div>
 
           <div v-if="isLoadingOlder" class="text-xs text-gray-400 py-2">加载更早日志...</div>
 
@@ -128,7 +135,7 @@
           </div>
 
           <div
-            v-for="line in logLines"
+            v-for="line in visibleLogLines"
             :key="line.id"
             class="h-6 log-line"
             :data-line-id="line.id"
@@ -156,7 +163,7 @@
 
           <div v-if="isLoadingNewer" class="text-xs text-gray-400 py-2">加载更新日志...</div>
 
-          <div :style="{ height: `${bottomVirtualSpacerPx}px` }"></div>
+          <div :style="{ height: `${renderedBottomSpacerPx}px` }"></div>
 
           <div v-if="finished" class="mt-3 pt-3 border-t border-gray-200 text-gray-400 text-xs">
             — Log stream ended —
@@ -221,14 +228,17 @@ interface LogContentResponse {
 }
 
 const DEFAULT_WINDOW_BYTES = 256 * 1024
-const SCROLL_WINDOW_BYTES = 96 * 1024
-const MAX_LINES_IN_MEMORY = 5000
+const SCROLL_WINDOW_BYTES = 64 * 1024
+const MAX_LINES_IN_MEMORY = 3000
 const LOG_LINE_HEIGHT_PX = 24
 const LOG_FONT_SIZE_OPTIONS = [12, 13, 14, 16]
-const LIVE_FLUSH_INTERVAL_MS = 50
+const LIVE_FLUSH_INTERVAL_MS = 120
+const LIVE_MAX_LINES_PER_FLUSH = 400
 const TOP_LOAD_THRESHOLD = 80
 const BOTTOM_LOAD_THRESHOLD = 80
-const BOUNDARY_LOAD_COOLDOWN_MS = 120
+const BOUNDARY_LOAD_COOLDOWN_MS = 220
+const SCROLL_IDLE_TRIGGER_MS = 140
+const VIRTUAL_OVERSCAN_LINES = 60
 
 const TERMINAL_STATUSES = new Set(['COMPLETED', 'FAILED', 'TIMEOUT', 'CANCELLED'])
 
@@ -238,6 +248,8 @@ const props = defineProps<{
 
 const logLines = ref<LogLine[]>([])
 const logContainerRef = ref<HTMLElement | null>(null)
+const scrollTopPx = ref(0)
+const viewportHeightPx = ref(0)
 const autoScroll = ref(true)
 const initialLoading = ref(true)
 const connecting = ref(false)
@@ -253,6 +265,7 @@ const hasMoreBackward = ref(false)
 const hasMoreForward = ref(false)
 const isLoadingOlder = ref(false)
 const isLoadingNewer = ref(false)
+const isRelocatingWindow = ref(false)
 
 const droppedHeadLines = ref(0)
 const droppedTailLines = ref(0)
@@ -276,6 +289,7 @@ const liveQueue: LogLine[] = []
 const textEncoder = new TextEncoder()
 let lineIdSeed = 0
 let flushTimer: ReturnType<typeof setTimeout> | null = null
+let scrollIdleTimer: ReturnType<typeof setTimeout> | null = null
 let scrollRafId: number | null = null
 let lastBoundaryLoadAt = 0
 let nextLiveByteCursor: number | null = null
@@ -312,10 +326,70 @@ const bottomVirtualSpacerPx = computed(() => {
   return bottomSpacerPx.value + Math.round(estimatedLines * LOG_LINE_HEIGHT_PX)
 })
 
+const visibleStartIndex = computed(() => {
+  if (logLines.value.length === 0) return 0
+  const loadedBlockHeight = logLines.value.length * LOG_LINE_HEIGHT_PX
+  const offsetInLoadedBlock = Math.max(
+    0,
+    Math.min(loadedBlockHeight, scrollTopPx.value - topVirtualSpacerPx.value)
+  )
+  const estimatedStart = Math.floor(offsetInLoadedBlock / LOG_LINE_HEIGHT_PX) - VIRTUAL_OVERSCAN_LINES
+  return Math.max(0, Math.min(logLines.value.length, estimatedStart))
+})
+
+const visibleEndIndex = computed(() => {
+  const viewportLines = Math.max(1, Math.ceil(viewportHeightPx.value / LOG_LINE_HEIGHT_PX))
+  const windowSize = viewportLines + VIRTUAL_OVERSCAN_LINES * 2
+  return Math.max(visibleStartIndex.value, Math.min(logLines.value.length, visibleStartIndex.value + windowSize))
+})
+
+const visibleLogLines = computed(() => logLines.value.slice(visibleStartIndex.value, visibleEndIndex.value))
+
+const renderedTopSpacerPx = computed(() => {
+  return topVirtualSpacerPx.value + visibleStartIndex.value * LOG_LINE_HEIGHT_PX
+})
+
+const renderedBottomSpacerPx = computed(() => {
+  return bottomVirtualSpacerPx.value + Math.max(0, logLines.value.length - visibleEndIndex.value) * LOG_LINE_HEIGHT_PX
+})
+
+const loadedBlockHeightPx = computed(() => logLines.value.length * LOG_LINE_HEIGHT_PX)
+
+const totalVirtualContentHeightPx = computed(() => {
+  return topVirtualSpacerPx.value + loadedBlockHeightPx.value + bottomVirtualSpacerPx.value
+})
+
 const logContainerStyle = computed(() => ({
   fontSize: `${logFontSizePx.value}px`,
   lineHeight: `${LOG_LINE_HEIGHT_PX}px`,
 }))
+
+const syncViewportMetrics = () => {
+  if (!logContainerRef.value) return
+  scrollTopPx.value = logContainerRef.value.scrollTop
+  viewportHeightPx.value = logContainerRef.value.clientHeight
+}
+
+const isViewportOutsideLoadedBlock = () => {
+  if (!logContainerRef.value || logLines.value.length === 0) return false
+
+  const viewportTop = scrollTopPx.value
+  const viewportBottom = viewportTop + viewportHeightPx.value
+  const loadedTop = topVirtualSpacerPx.value
+  const loadedBottom = loadedTop + loadedBlockHeightPx.value
+  const margin = LOG_LINE_HEIGHT_PX * VIRTUAL_OVERSCAN_LINES
+
+  return viewportBottom < loadedTop - margin || viewportTop > loadedBottom + margin
+}
+
+const estimateByteOffsetForViewport = () => {
+  if (!logContainerRef.value || fileSize.value <= 0) return 0
+
+  const totalHeight = Math.max(1, totalVirtualContentHeightPx.value)
+  const viewportCenter = scrollTopPx.value + viewportHeightPx.value / 2
+  const normalized = Math.min(1, Math.max(0, viewportCenter / totalHeight))
+  return Math.round(fileSize.value * normalized)
+}
 
 const isNearBottom = () => {
   if (!logContainerRef.value) return false
@@ -432,8 +506,22 @@ const splitLivePayloadToLines = (payload: string, isStderr: boolean): LogLine[] 
 }
 
 const syncOffsetRangeFromVisibleLines = () => {
-  const first = logLines.value.find((line) => line.byteStart !== undefined)
-  const last = [...logLines.value].reverse().find((line) => line.byteAfter !== undefined)
+  let first: LogLine | undefined
+  for (const line of logLines.value) {
+    if (line.byteStart !== undefined) {
+      first = line
+      break
+    }
+  }
+
+  let last: LogLine | undefined
+  for (let i = logLines.value.length - 1; i >= 0; i -= 1) {
+    const line = logLines.value[i]
+    if (line.byteAfter !== undefined) {
+      last = line
+      break
+    }
+  }
 
   if (first?.byteStart !== undefined) {
     earliestOffset.value = first.byteStart
@@ -456,37 +544,37 @@ const syncOffsetRangeFromVisibleLines = () => {
   }
 }
 
-const captureScrollAnchor = () => {
-  if (!logContainerRef.value) return null
-  const container = logContainerRef.value
-  const containerRect = container.getBoundingClientRect()
-  const lineEls = Array.from(container.querySelectorAll('.log-line')) as HTMLElement[]
-  const anchorEl = lineEls.find((el) => {
-    const rect = el.getBoundingClientRect()
-    return rect.bottom >= containerRect.top
-  })
-  if (!anchorEl) return null
+const syncOffsetsFromVisibleEdges = () => {
+  if (logLines.value.length === 0) return
 
-  const lineIdRaw = anchorEl.dataset.lineId
-  if (!lineIdRaw) return null
-  const lineId = Number(lineIdRaw)
-  if (Number.isNaN(lineId)) return null
+  const first = logLines.value[0]
+  const last = logLines.value[logLines.value.length - 1]
 
-  return {
-    lineId,
-    offsetTop: anchorEl.getBoundingClientRect().top - containerRect.top,
+  if (first?.byteStart !== undefined) {
+    earliestOffset.value = first.byteStart
+    loadedStartOffset.value = first.byteStart
+  }
+
+  if (last?.byteAfter !== undefined) {
+    latestOffset.value = last.byteAfter
+    loadedEndOffset.value = Math.max(loadedEndOffset.value, last.byteAfter)
+    nextLiveByteCursor = last.byteAfter
+    fileSize.value = Math.max(fileSize.value, last.byteAfter)
   }
 }
 
-const restoreScrollAnchor = (anchor: { lineId: number; offsetTop: number } | null) => {
-  if (!anchor || !logContainerRef.value) return
-  const container = logContainerRef.value
-  const containerRect = container.getBoundingClientRect()
-  const el = container.querySelector(`.log-line[data-line-id="${anchor.lineId}"]`) as HTMLElement | null
-  if (!el) return
+const updateAvgBytesFromChunk = (lines: LogLine[]) => {
+  let totalBytes = 0
+  let totalLines = 0
+  for (const line of lines) {
+    if (line.byteStart === undefined || line.byteAfter === undefined) continue
+    totalBytes += Math.max(1, line.byteAfter - line.byteStart)
+    totalLines += 1
+  }
+  if (totalLines === 0) return
 
-  const currentTop = el.getBoundingClientRect().top - containerRect.top
-  container.scrollTop += currentTop - anchor.offsetTop
+  const sampleAvg = totalBytes / totalLines
+  avgBytesPerLine.value = Math.max(1, avgBytesPerLine.value * 0.85 + sampleAvg * 0.15)
 }
 
 const scheduleScrollToBottom = () => {
@@ -497,6 +585,7 @@ const scheduleScrollToBottom = () => {
     scrollRafId = null
     if (!logContainerRef.value) return
     logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight
+    syncViewportMetrics()
   })
 }
 
@@ -506,9 +595,15 @@ const clearHighlights = () => {
   }
 }
 
-const applyMemoryLimit = (anchor: 'prepend' | 'append' | 'replace') => {
+const applyMemoryLimit = (
+  anchor: 'prepend' | 'append' | 'replace',
+  options: { skipSync?: boolean } = {}
+) => {
+  const { skipSync = false } = options
   const total = logLines.value.length
-  if (total <= MAX_LINES_IN_MEMORY) return
+  if (total <= MAX_LINES_IN_MEMORY) {
+    return { trimmedHead: 0, trimmedTail: 0 }
+  }
 
   const overflow = total - MAX_LINES_IN_MEMORY
   const overflowPx = overflow * LOG_LINE_HEIGHT_PX
@@ -517,13 +612,19 @@ const applyMemoryLimit = (anchor: 'prepend' | 'append' | 'replace') => {
     logLines.value.splice(MAX_LINES_IN_MEMORY)
     droppedTailLines.value += overflow
     bottomSpacerPx.value += overflowPx
+    if (!skipSync) {
+      syncOffsetRangeFromVisibleLines()
+    }
+    return { trimmedHead: 0, trimmedTail: overflow }
   } else {
     logLines.value.splice(0, overflow)
     droppedHeadLines.value += overflow
     topSpacerPx.value += overflowPx
+    if (!skipSync) {
+      syncOffsetRangeFromVisibleLines()
+    }
+    return { trimmedHead: overflow, trimmedTail: 0 }
   }
-
-  syncOffsetRangeFromVisibleLines()
 }
 
 const refreshWindowFlags = () => {
@@ -539,8 +640,10 @@ const syncTaskStatus = (status: string | undefined) => {
 
 const applyWindowChunk = async (
   windowData: LogWindowResponse,
-  mode: 'replace' | 'prepend' | 'append'
+  mode: 'replace' | 'prepend' | 'append',
+  options: { scrollToBottomOnReplace?: boolean } = {}
 ) => {
+  const { scrollToBottomOnReplace = false } = options
   syncTaskStatus(windowData.status)
   const chunkLines = splitWindowTextToLines(windowData.text, windowData.window_start)
   fileSize.value = windowData.file_size || 0
@@ -556,28 +659,41 @@ const applyWindowChunk = async (
     loadedStartOffset.value = windowData.window_start
     loadedEndOffset.value = windowData.window_end
     nextLiveByteCursor = windowData.window_end
-    applyMemoryLimit('replace')
-    syncOffsetRangeFromVisibleLines()
+    applyMemoryLimit('replace', { skipSync: true })
+    syncOffsetsFromVisibleEdges()
+    updateAvgBytesFromChunk(chunkLines)
     refreshWindowFlags()
     await nextTick()
-    scheduleScrollToBottom()
+    syncViewportMetrics()
+    if (scrollToBottomOnReplace) {
+      scheduleScrollToBottom()
+    }
     return
   }
 
   if (mode === 'prepend') {
-    const anchor = captureScrollAnchor()
+    const container = logContainerRef.value
+    const previousScrollHeight = container?.scrollHeight ?? 0
+    const previousScrollTop = container?.scrollTop ?? 0
     const recovered = Math.min(droppedHeadLines.value, chunkLines.length)
     droppedHeadLines.value -= recovered
     topSpacerPx.value = Math.max(0, topSpacerPx.value - recovered * LOG_LINE_HEIGHT_PX)
 
-    logLines.value = [...chunkLines, ...logLines.value]
+    if (chunkLines.length > 0) {
+      logLines.value.unshift(...chunkLines)
+    }
     loadedStartOffset.value = Math.min(loadedStartOffset.value, windowData.window_start)
-    applyMemoryLimit('prepend')
-    syncOffsetRangeFromVisibleLines()
+    applyMemoryLimit('prepend', { skipSync: true })
+    syncOffsetsFromVisibleEdges()
+    updateAvgBytesFromChunk(chunkLines)
     refreshWindowFlags()
 
     await nextTick()
-    restoreScrollAnchor(anchor)
+    if (container) {
+      const delta = container.scrollHeight - previousScrollHeight
+      container.scrollTop = previousScrollTop + Math.max(0, delta)
+    }
+    syncViewportMetrics()
     return
   }
 
@@ -586,8 +702,9 @@ const applyWindowChunk = async (
   bottomSpacerPx.value = Math.max(0, bottomSpacerPx.value - recovered * LOG_LINE_HEIGHT_PX)
   logLines.value.push(...chunkLines)
   loadedEndOffset.value = Math.max(loadedEndOffset.value, windowData.window_end)
-  applyMemoryLimit('append')
-  syncOffsetRangeFromVisibleLines()
+  applyMemoryLimit('append', { skipSync: true })
+  syncOffsetsFromVisibleEdges()
+  updateAvgBytesFromChunk(chunkLines)
   latestOffset.value = Math.max(latestOffset.value, windowData.window_end)
   nextLiveByteCursor = latestOffset.value
   refreshWindowFlags()
@@ -623,7 +740,7 @@ const loadInitialWindow = async () => {
     const data = await fetchLogWindow({ direction: 'backward', limit_bytes: DEFAULT_WINDOW_BYTES })
     taskStatus.value = data.status || ''
     finished.value = TERMINAL_STATUSES.has(data.status || '')
-    await applyWindowChunk(data, 'replace')
+    await applyWindowChunk(data, 'replace', { scrollToBottomOnReplace: true })
   } catch (error) {
     console.error('Failed to load initial log window', error)
   } finally {
@@ -667,27 +784,76 @@ const loadNewerLogs = async (limitBytes = SCROLL_WINDOW_BYTES) => {
   }
 }
 
-const enqueueLiveLine = (line: string, isStderr: boolean) => {
-  liveQueue.push(...splitLivePayloadToLines(line, isStderr))
+const relocateWindowToViewport = async () => {
+  if (isRelocatingWindow.value || initialLoading.value || fileSize.value <= 0) return
+  if (!isViewportOutsideLoadedBlock()) return
 
+  isRelocatingWindow.value = true
+  try {
+    const targetOffset = estimateByteOffsetForViewport()
+    const cursor = Math.max(0, Math.min(fileSize.value, targetOffset + Math.floor(DEFAULT_WINDOW_BYTES / 2)))
+    const data = await fetchLogWindow({
+      direction: 'backward',
+      cursor,
+      limit_bytes: DEFAULT_WINDOW_BYTES,
+    })
+    await applyWindowChunk(data, 'replace')
+
+    if (logContainerRef.value) {
+      const blockStart = topVirtualSpacerPx.value
+      const relativeBytes = Math.max(0, targetOffset - loadedStartOffset.value)
+      const relativeLines = Math.max(0, Math.round(relativeBytes / Math.max(1, avgBytesPerLine.value)))
+      const targetTop = blockStart + relativeLines * LOG_LINE_HEIGHT_PX
+      const centerOffset = Math.max(0, (logContainerRef.value.clientHeight - LOG_LINE_HEIGHT_PX) / 2)
+      logContainerRef.value.scrollTop = Math.max(0, targetTop - centerOffset)
+      syncViewportMetrics()
+    }
+  } catch (error) {
+    console.error('Failed to relocate log window', error)
+  } finally {
+    isRelocatingWindow.value = false
+  }
+}
+
+const scheduleLiveFlush = () => {
   if (flushTimer) return
   flushTimer = setTimeout(() => {
     flushTimer = null
     if (liveQueue.length === 0) return
 
-    const pending = liveQueue.splice(0, liveQueue.length)
+    const pending = liveQueue.splice(0, LIVE_MAX_LINES_PER_FLUSH)
     const atBottom = isNearBottom()
 
     logLines.value.push(...pending)
-    applyMemoryLimit('append')
-    syncOffsetRangeFromVisibleLines()
+    applyMemoryLimit('append', { skipSync: true })
+    syncOffsetsFromVisibleEdges()
+    updateAvgBytesFromChunk(pending)
     refreshWindowFlags()
     hasMoreForward.value = false
 
     if (autoScroll.value || atBottom) {
       scheduleScrollToBottom()
     }
+
+    if (liveQueue.length > 0) {
+      scheduleLiveFlush()
+    }
   }, LIVE_FLUSH_INTERVAL_MS)
+}
+
+const enqueueLiveLine = (line: string, isStderr: boolean) => {
+  liveQueue.push(...splitLivePayloadToLines(line, isStderr))
+  scheduleLiveFlush()
+}
+
+const scrollToLineIndex = async (lineIndex: number) => {
+  if (!logContainerRef.value) return
+  const clampedIndex = Math.max(0, Math.min(logLines.value.length - 1, lineIndex))
+  const targetTop = topVirtualSpacerPx.value + clampedIndex * LOG_LINE_HEIGHT_PX
+  const centerOffset = Math.max(0, (logContainerRef.value.clientHeight - LOG_LINE_HEIGHT_PX) / 2)
+  logContainerRef.value.scrollTop = Math.max(0, targetTop - centerOffset)
+  syncViewportMetrics()
+  await nextTick()
 }
 
 const highlightCurrentQuery = async () => {
@@ -696,50 +862,45 @@ const highlightCurrentQuery = async () => {
   const query = searchQuery.value
   if (!query) return
 
-  let firstHighlightId: number | null = null
-  for (const line of logLines.value) {
+  let firstHighlightIndex = -1
+  for (let i = 0; i < logLines.value.length; i += 1) {
+    const line = logLines.value[i]
     if (line.text.includes(query)) {
       line.highlight = true
-      if (firstHighlightId === null) {
-        firstHighlightId = line.id
+      if (firstHighlightIndex === -1) {
+        firstHighlightIndex = i
       }
     }
   }
 
-  if (firstHighlightId === null) return
-
-  await nextTick()
-  if (!logContainerRef.value) return
-
-  const target = logContainerRef.value.querySelector(`.log-line[data-line-id="${firstHighlightId}"]`) as HTMLElement | null
-  target?.scrollIntoView({ block: 'center' })
+  if (firstHighlightIndex < 0) return
+  await scrollToLineIndex(firstHighlightIndex)
 }
 
 const highlightLineByOffset = async (offset: number) => {
   clearHighlights()
 
-  let targetLine: LogLine | undefined
-  for (const line of logLines.value) {
+  let targetLineIndex = -1
+  for (let i = 0; i < logLines.value.length; i += 1) {
+    const line = logLines.value[i]
     if (line.byteStart === undefined || line.byteEnd === undefined) {
       continue
     }
     if (offset >= line.byteStart && offset < line.byteEnd) {
-      targetLine = line
+      targetLineIndex = i
       break
     }
   }
 
-  if (!targetLine) {
+  if (targetLineIndex < 0) {
     await highlightCurrentQuery()
     return
   }
 
+  const targetLine = logLines.value[targetLineIndex]
+  if (!targetLine) return
   targetLine.highlight = true
-
-  await nextTick()
-  if (!logContainerRef.value) return
-  const target = logContainerRef.value.querySelector(`.log-line[data-line-id="${targetLine.id}"]`) as HTMLElement | null
-  target?.scrollIntoView({ block: 'center' })
+  await scrollToLineIndex(targetLineIndex)
 }
 
 const performSearch = async (reset: boolean) => {
@@ -813,21 +974,45 @@ const expandFoldedTail = async () => {
   await loadNewerLogs(DEFAULT_WINDOW_BYTES)
 }
 
+const scheduleBoundaryLoadCheck = () => {
+  if (scrollIdleTimer) {
+    clearTimeout(scrollIdleTimer)
+  }
+
+  scrollIdleTimer = setTimeout(() => {
+    scrollIdleTimer = null
+    const now = Date.now()
+    if (now - lastBoundaryLoadAt <= BOUNDARY_LOAD_COOLDOWN_MS) return
+
+    if (isViewportOutsideLoadedBlock()) {
+      lastBoundaryLoadAt = now
+      void relocateWindowToViewport()
+      return
+    }
+
+    if (isNearTopLoadBoundary()) {
+      lastBoundaryLoadAt = now
+      void loadOlderLogs()
+      return
+    }
+
+    if (isNearBottomLoadBoundary() && hasMoreForward.value) {
+      lastBoundaryLoadAt = now
+      void loadNewerLogs()
+    }
+  }, SCROLL_IDLE_TRIGGER_MS)
+}
+
 const handleScroll = () => {
   if (!logContainerRef.value) return
 
+  syncViewportMetrics()
   autoScroll.value = isNearBottom()
-  const now = Date.now()
+  scheduleBoundaryLoadCheck()
+}
 
-  if (isNearTopLoadBoundary() && now - lastBoundaryLoadAt > BOUNDARY_LOAD_COOLDOWN_MS) {
-    lastBoundaryLoadAt = now
-    void loadOlderLogs()
-  }
-
-  if (isNearBottomLoadBoundary() && hasMoreForward.value && now - lastBoundaryLoadAt > BOUNDARY_LOAD_COOLDOWN_MS) {
-    lastBoundaryLoadAt = now
-    void loadNewerLogs()
-  }
+const handleWindowResize = () => {
+  syncViewportMetrics()
 }
 
 const connectWs = () => {
@@ -863,7 +1048,8 @@ const connectWs = () => {
       }
 
       if (data.type === 'log') {
-        enqueueLiveLine(data.line || '', Boolean(data.is_stderr))
+        const lineText = typeof data.line === 'string' ? data.line : ''
+        enqueueLiveLine(lineText, Boolean(data.is_stderr))
 
         if (data.finished) {
           finished.value = true
@@ -900,6 +1086,11 @@ const disconnectWs = () => {
     flushTimer = null
   }
 
+  if (scrollIdleTimer) {
+    clearTimeout(scrollIdleTimer)
+    scrollIdleTimer = null
+  }
+
   if (scrollRafId !== null) {
     window.cancelAnimationFrame(scrollRafId)
     scrollRafId = null
@@ -910,10 +1101,14 @@ const disconnectWs = () => {
 
 onMounted(async () => {
   await loadInitialWindow()
+  await nextTick()
+  syncViewportMetrics()
+  window.addEventListener('resize', handleWindowResize)
   connectWs()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleWindowResize)
   disconnectWs()
 })
 </script>
