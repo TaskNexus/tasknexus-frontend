@@ -161,7 +161,6 @@ const navItems = computed(() => {
   { name: t('nav.aiChat'), to: '/chat', routeName: 'ai-chat', icon: MessageSquare },
   { name: t('nav.projects'), to: '/projects', routeName: 'projects', icon: FolderKanban },
   { name: t('nav.workflows'), to: '/workflows', routeName: 'workflows', icon: Workflow },
-  { name: t('nav.tickets'), to: '/tickets', routeName: 'tickets', icon: Ticket },
   { 
       name: t('nav.tasks'),
       icon: CheckSquare,
@@ -173,6 +172,7 @@ const navItems = computed(() => {
           { name: t('nav.webhookTasks'), to: '/tasks/webhook', routeName: 'tasks-webhook' },
       ]
   },
+  { name: '工单列表', to: '/tickets', routeName: 'tickets', icon: Ticket },
   ]
   // Maintainer+ only: Platform Settings (includes permissions matrix)
   const role = authStore.user?.platform_role || authStore.user?.role

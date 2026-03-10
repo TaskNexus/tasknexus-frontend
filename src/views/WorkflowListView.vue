@@ -90,7 +90,7 @@
                      <td class="py-3 text-center"><input type="checkbox"></td>
                      <td class="py-3">{{ flow.id }}</td>
                      <td class="py-3">
-                         <span class="text-blue-600 cursor-pointer hover:underline font-medium" @click="openCanvas(flow.id)">{{ flow.name }}</span>
+                         <span class="text-blue-600 cursor-pointer hover:underline font-medium" @click="handleCreateTaskClick(flow.id)">{{ flow.name }}</span>
                      </td>
                      <td class="py-3 text-center">
                          <div class="flex justify-center gap-1">
@@ -103,9 +103,9 @@
                      <td class="py-3 text-gray-500">{{ flow.created_by_username || 'admin' }}</td>
                       <td class="py-3 text-gray-500">{{ flow.updated_by_username || 'admin' }}</td>
                      <td class="py-3 text-center">
-                         <div class="flex justify-center space-x-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <div class="flex justify-center space-x-3">
                              <button class="text-blue-600 hover:text-blue-800 text-xs" @click="handleClone(flow.id, flow.name)">克隆</button>
-                             <button class="text-blue-600 hover:text-blue-800 text-xs" @click="handleCreateTaskClick(flow.id)">创建任务</button>
+                             <button class="text-blue-600 hover:text-blue-800 text-xs" @click="openCanvas(flow.id)">编辑</button>
                              <button class="text-red-500 hover:text-red-700 text-xs" @click="deleteWorkflow(flow.id)">删除</button>
                          </div>
                      </td>
@@ -330,3 +330,4 @@ const handleCreateTaskClick = (id: number) => {
     })
 }
 </script>
+
