@@ -228,31 +228,98 @@
                                         placeholder="搜索飞书用户"
                                     />
                                 </div>
-                                <div class="max-h-56 overflow-y-auto p-1">
+                                <div class="max-h-80 overflow-y-auto p-1">
                                     <div v-if="loadingFeishuUsers" class="text-center py-3">
                                         <Loader2 class="w-4 h-4 animate-spin mx-auto text-blue-500" />
                                     </div>
                                     <template v-else-if="feishuUserList.length > 0">
-                                        <div v-if="filteredFeishuUsers.length === 0" class="text-center py-3">
+                                        <div class="sticky top-0 z-10 bg-white border-b border-gray-100 px-2 py-2 mb-1 rounded-sm">
+                                            <div class="flex items-center justify-between gap-2 text-xs text-gray-500">
+                                                <span>显示 {{ filteredFeishuUsers.length }} / {{ feishuUserList.length }}，已选 {{ feishuNotifyOpenIds.length }}</span>
+                                                <div class="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        class="text-blue-600 hover:text-blue-700 disabled:text-gray-300"
+                                                        :disabled="filteredFeishuUsers.length === 0"
+                                                        @click.stop="selectAllFilteredFeishuUsers"
+                                                    >
+                                                        全选筛选
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        class="text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+                                                        :disabled="feishuNotifyOpenIds.length === 0 || filteredFeishuUsers.length === 0"
+                                                        @click.stop="clearFilteredFeishuUsersSelection"
+                                                    >
+                                                        清空筛选
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="mt-1 flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    class="text-xs text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+                                                    :disabled="!hasCollapsedFeishuGroups"
+                                                    @click.stop="setFeishuGroupsCollapsed(false)"
+                                                >
+                                                    展开全部
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="text-xs text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+                                                    :disabled="!hasExpandedFeishuGroups"
+                                                    @click.stop="setFeishuGroupsCollapsed(true)"
+                                                >
+                                                    折叠全部
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div v-if="groupedFeishuUsers.length === 0" class="text-center py-3">
                                             <p class="text-sm text-gray-500">无匹配用户</p>
                                         </div>
-                                        <template v-else>
-                                            <button
-                                                v-for="user in filteredFeishuUsers"
-                                                :key="user.open_id"
-                                                type="button"
-                                                class="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 text-left"
-                                                @click="toggleFeishuUser(user.open_id)"
+                                        <div v-else class="space-y-1">
+                                            <div
+                                                v-for="group in groupedFeishuUsers"
+                                                :key="group.key"
+                                                class="border border-gray-100 rounded-md"
                                             >
-                                                <input
-                                                    type="checkbox"
-                                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
-                                                    :checked="feishuNotifyOpenIds.includes(user.open_id)"
-                                                    readonly
-                                                />
-                                                <span class="text-sm text-gray-700">{{ user.name }}</span>
-                                            </button>
-                                        </template>
+                                                <button
+                                                    type="button"
+                                                    class="w-full flex items-center gap-2 px-2 py-1.5 bg-gray-50 hover:bg-gray-100 text-left"
+                                                    @click.stop="toggleFeishuGroup(group.key)"
+                                                >
+                                                    <svg
+                                                        class="w-3.5 h-3.5 text-gray-500 transition-transform"
+                                                        :class="isFeishuGroupCollapsed(group.key) ? '-rotate-90' : 'rotate-0'"
+                                                        viewBox="0 0 20 20"
+                                                        fill="currentColor"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                                    </svg>
+                                                    <span class="text-xs font-medium text-gray-700">{{ group.key }}</span>
+                                                    <span class="ml-auto text-[11px] text-gray-500">{{ group.selectedCount }}/{{ group.users.length }}</span>
+                                                </button>
+                                                <div v-show="!isFeishuGroupCollapsed(group.key)" class="p-1 space-y-0.5">
+                                                    <button
+                                                        v-for="user in group.users"
+                                                        :key="user.open_id"
+                                                        type="button"
+                                                        class="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 text-left"
+                                                        @click.stop="toggleFeishuUser(user.open_id)"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
+                                                            :checked="feishuNotifyOpenIds.includes(user.open_id)"
+                                                            readonly
+                                                        />
+                                                        <span class="text-sm text-gray-700 truncate">{{ user.name }}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </template>
                                     <div v-else class="text-center py-3">
                                         <div v-if="feishuApiError" class="bg-amber-50 border border-amber-200 rounded p-2">
@@ -327,7 +394,7 @@ const webhookSecret = ref('')
 // Feishu direct notification
 const feishuNotifyEnabled = ref(false)
 const feishuNotifyOpenIds = ref<string[]>([])
-const feishuUserList = ref<any[]>([])
+const feishuUserList = ref<FeishuUserOption[]>([])
 const loadingFeishuUsers = ref(false)
 const feishuApiError = ref('')
 const feishuApiHint = ref('')
@@ -335,6 +402,10 @@ const feishuFetched = ref(false)
 const feishuDropdownOpen = ref(false)
 const feishuUserSearch = ref('')
 const feishuDropdownRef = ref<HTMLElement | null>(null)
+const feishuGroupCollapsed = ref<Record<string, boolean>>({})
+const currentUserFeishuOpenId = ref('')
+const currentUserFeishuName = ref('')
+const autoSelectedCurrentFeishuUser = ref(false)
 
 watch(feishuNotifyEnabled, (val) => {
     if (val && !feishuFetched.value) {
@@ -375,6 +446,17 @@ interface ParamItem {
     source: 'global' | 'workflow'
 }
 
+interface FeishuUserOption {
+    open_id: string
+    name: string
+}
+
+interface FeishuUserGroup {
+    key: string
+    users: FeishuUserOption[]
+    selectedCount: number
+}
+
 // Computed
 const pageTitle = computed(() => isEditMode.value ? '编辑任务' : '创建任务')
 const submitButtonText = computed(() => {
@@ -397,6 +479,32 @@ const isValid = computed(() => {
     return true
 })
 
+const getFeishuGroupKey = (name: string) => {
+    const normalized = String(name || '').trim()
+    if (!normalized) return '未命名'
+    const first = normalized.charAt(0)
+    if (/[a-z]/i.test(first)) return first.toUpperCase()
+    if (/[0-9]/.test(first)) return '0-9'
+    return first
+}
+
+const normalizeFeishuUsers = (users: any[]): FeishuUserOption[] => {
+    const seen = new Set<string>()
+    const normalized: FeishuUserOption[] = []
+
+    for (const rawUser of users || []) {
+        const openId = String(rawUser?.open_id || '').trim()
+        if (!openId || seen.has(openId)) continue
+
+        seen.add(openId)
+        const name = String(rawUser?.name || openId).trim() || openId
+        normalized.push({ open_id: openId, name })
+    }
+
+    normalized.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+    return normalized
+}
+
 const filteredFeishuUsers = computed(() => {
     const q = feishuUserSearch.value.trim().toLowerCase()
     if (!q) return feishuUserList.value
@@ -407,6 +515,27 @@ const filteredFeishuUsers = computed(() => {
     })
 })
 
+const groupedFeishuUsers = computed<FeishuUserGroup[]>(() => {
+    const groupMap = new Map<string, FeishuUserOption[]>()
+
+    for (const user of filteredFeishuUsers.value) {
+        const key = getFeishuGroupKey(user.name)
+        const list = groupMap.get(key) || []
+        list.push(user)
+        groupMap.set(key, list)
+    }
+
+    const groups = Array.from(groupMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b, 'zh-Hans-CN'))
+        .map(([key, users]) => ({
+            key,
+            users: users.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN')),
+            selectedCount: users.filter((user) => feishuNotifyOpenIds.value.includes(user.open_id)).length,
+        }))
+
+    return groups
+})
+
 const feishuSelectionSummary = computed(() => {
     const selectedUsers = feishuUserList.value.filter((user) => feishuNotifyOpenIds.value.includes(user.open_id))
     if (selectedUsers.length === 0) return '请选择飞书用户'
@@ -414,6 +543,63 @@ const feishuSelectionSummary = computed(() => {
     if (names.length <= 2) return names.join(', ')
     return `${names.slice(0, 2).join(', ')} +${names.length - 2}`
 })
+
+const maybeAutoSelectCurrentFeishuUser = () => {
+    if (isEditMode.value) return
+    if (!feishuNotifyEnabled.value) return
+    if (autoSelectedCurrentFeishuUser.value) return
+    if (feishuNotifyOpenIds.value.length > 0) return
+    if (feishuUserList.value.length === 0) return
+
+    let matchedOpenId = ''
+
+    if (currentUserFeishuOpenId.value) {
+        const target = feishuUserList.value.find((u) => u.open_id === currentUserFeishuOpenId.value)
+        if (target) matchedOpenId = target.open_id
+    }
+
+    if (!matchedOpenId && currentUserFeishuName.value) {
+        const sameNameUsers = feishuUserList.value.filter((u) => u.name === currentUserFeishuName.value)
+        if (sameNameUsers.length === 1) {
+            matchedOpenId = sameNameUsers[0].open_id
+        }
+    }
+
+    if (matchedOpenId) {
+        feishuNotifyOpenIds.value = [matchedOpenId]
+        autoSelectedCurrentFeishuUser.value = true
+    }
+}
+
+const isFeishuGroupCollapsed = (groupKey: string) => !!feishuGroupCollapsed.value[groupKey]
+
+const toggleFeishuGroup = (groupKey: string) => {
+    feishuGroupCollapsed.value[groupKey] = !isFeishuGroupCollapsed(groupKey)
+}
+
+const setFeishuGroupsCollapsed = (collapsed: boolean) => {
+    const nextState: Record<string, boolean> = {}
+    groupedFeishuUsers.value.forEach((group) => {
+        nextState[group.key] = collapsed
+    })
+    feishuGroupCollapsed.value = nextState
+}
+
+const hasCollapsedFeishuGroups = computed(() => groupedFeishuUsers.value.some((group) => isFeishuGroupCollapsed(group.key)))
+const hasExpandedFeishuGroups = computed(() => groupedFeishuUsers.value.some((group) => !isFeishuGroupCollapsed(group.key)))
+
+const selectAllFilteredFeishuUsers = () => {
+    if (filteredFeishuUsers.value.length === 0) return
+    const merged = new Set(feishuNotifyOpenIds.value)
+    filteredFeishuUsers.value.forEach((user) => merged.add(user.open_id))
+    feishuNotifyOpenIds.value = Array.from(merged)
+}
+
+const clearFilteredFeishuUsersSelection = () => {
+    if (filteredFeishuUsers.value.length === 0) return
+    const filteredIds = new Set(filteredFeishuUsers.value.map((user) => user.open_id))
+    feishuNotifyOpenIds.value = feishuNotifyOpenIds.value.filter((id) => !filteredIds.has(id))
+}
 
 const toggleFeishuUser = (openId: string) => {
     if (feishuNotifyOpenIds.value.includes(openId)) {
@@ -442,9 +628,39 @@ watch(feishuDropdownOpen, (open) => {
     if (!open) feishuUserSearch.value = ''
 })
 
+watch(groupedFeishuUsers, (groups) => {
+    const nextState: Record<string, boolean> = {}
+    groups.forEach((group, index) => {
+        // Keep previous collapse state; if first time with many groups, collapse tail groups by default.
+        nextState[group.key] = feishuGroupCollapsed.value[group.key] ?? (groups.length > 8 && index >= 5)
+    })
+    feishuGroupCollapsed.value = nextState
+}, { immediate: true })
+
+const fetchCurrentUserFeishuStatus = async () => {
+    try {
+        const { data } = await axios.get('/api/auth/feishu/status/')
+        if (data?.bound) {
+            currentUserFeishuOpenId.value = String(data.open_id || '').trim()
+            currentUserFeishuName.value = String(data.feishu_name || '').trim()
+            maybeAutoSelectCurrentFeishuUser()
+        } else {
+            currentUserFeishuOpenId.value = ''
+            currentUserFeishuName.value = ''
+        }
+    } catch {
+        currentUserFeishuOpenId.value = ''
+        currentUserFeishuName.value = ''
+    }
+}
+
 // Setup
 onMounted(async () => {
     document.addEventListener('click', handleDropdownOutsideClick)
+    if (!isEditMode.value) {
+        feishuNotifyEnabled.value = true
+        await fetchCurrentUserFeishuStatus()
+    }
     await fetchWorkflows()
     
     if (isEditMode.value && editTaskId.value) {
@@ -578,9 +794,10 @@ const fetchFeishuUsers = async () => {
     feishuApiHint.value = ''
     try {
         const { data } = await axios.get('/api/feishu/users/')
-        feishuUserList.value = data.users || []
+        feishuUserList.value = normalizeFeishuUsers(data.users || [])
         const validOpenIds = new Set(feishuUserList.value.map((user) => user.open_id))
         feishuNotifyOpenIds.value = feishuNotifyOpenIds.value.filter((id) => validOpenIds.has(id))
+        maybeAutoSelectCurrentFeishuUser()
         if (data.error) {
             feishuApiError.value = data.error
             feishuApiHint.value = data.hint || ''
