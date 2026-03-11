@@ -71,6 +71,12 @@
              <span>工作流: {{ task?.workflow_name }}</span>
              <span>开始时间: {{ formatDate(task?.started_at) }}</span>
         </div>
+        <div
+            v-if="snapshotWarning"
+            class="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+        >
+            {{ snapshotWarning }}
+        </div>
     </div>
 
 
@@ -187,6 +193,7 @@ let pollTimer: any = null
 const activeNode = ref<any>(null)
 const nodeData = ref<any>(null)
 const nodeLoading = ref(false)
+const snapshotWarning = ref('')
 
 
 // Computed: extract agent task_id from node outputs if this is a client_agent node
@@ -259,12 +266,12 @@ const fetchTask = async () => {
         if (navStack.value.length === 0 && task.value.workflow) {
             navStack.value.push({
                 label: '父节点',
-                workflowId: task.value.workflow,
+                workflowId: String(task.value.workflow),
                 subprocessNodeId: null,
                 type: 'graph'
             })
             // Load root graph
-            await loadGraph(task.value.workflow)
+            await loadGraph(String(task.value.workflow))
         }
     } catch (e) {
         console.error('Failed to fetch task', e)
@@ -275,10 +282,15 @@ const fetchTask = async () => {
 
 const loadGraph = async (workflowId: string) => {
     try {
-        const wfResp = await axios.get(`/api/workflows/${workflowId}/`)
+        const wfResp = await axios.get(`/api/tasks/${taskId}/graph_snapshot/`, {
+            params: { workflow_id: workflowId }
+        })
+        snapshotWarning.value = wfResp.data?.fallback
+            ? (wfResp.data?.message || '该任务无快照/快照缺失，当前展示最新工作流定义。')
+            : ''
         // Wait for next tick to ensure canvas is ready
         await nextTick()
-        if (flowCanvasRef.value && wfResp.data.graph_data) {
+        if (flowCanvasRef.value && wfResp.data?.graph_data) {
              flowCanvasRef.value.loadGraph(wfResp.data.graph_data)
              // Clean selection
              activeNode.value = null
@@ -286,6 +298,7 @@ const loadGraph = async (workflowId: string) => {
              updateNodeStates()
         }
     } catch (e) {
+        snapshotWarning.value = ''
         console.error("Failed to load graph", e)
     }
 }
@@ -407,14 +420,14 @@ const handleNodeDblClick = async (node: any) => {
     // Push to stack
     navStack.value.push({
         label: data.label || 'SubProcess',
-        workflowId: workflowId,
+        workflowId: String(workflowId),
         subprocessNodeId: node.id,
         type: 'graph'
     })
     
     // Load new graph
     loading.value = true
-    await loadGraph(workflowId)
+    await loadGraph(String(workflowId))
     loading.value = false
 }
 
