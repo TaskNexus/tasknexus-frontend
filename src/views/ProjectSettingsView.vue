@@ -492,6 +492,49 @@ const globalParams = ref<GlobalParam[]>([])
 const savingGlobalParams = ref(false)
 const addGlobalParam = () => { globalParams.value.push({ key: '', value: '', description: '' }) }
 const removeGlobalParam = (index: number) => { globalParams.value.splice(index, 1) }
+const IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+const normalizeGlobalParamsForSave = () => {
+  globalParams.value = globalParams.value.map((param) => ({
+    key: String(param.key || '').trim(),
+    value: String(param.value || ''),
+    description: String(param.description || '').trim(),
+  }))
+}
+
+const validateGlobalParamsForSave = (): string[] => {
+  const errors: string[] = []
+  const seen = new Set<string>()
+
+  globalParams.value.forEach((param, index) => {
+    const label = `全局参数 #${index + 1}`
+    if (!param.key) {
+      errors.push(`${label} 未填写参数名`)
+      return
+    }
+    if (!IDENTIFIER_REGEX.test(param.key)) {
+      errors.push(`${label} 参数名不合法：${param.key}（仅支持字母/数字/下划线，且不能数字开头）`)
+      return
+    }
+    if (seen.has(param.key)) {
+      errors.push(`${label} 与其他参数重名：${param.key}`)
+      return
+    }
+    seen.add(param.key)
+  })
+
+  return errors
+}
+
+const ensureGlobalParamsValid = (): boolean => {
+  normalizeGlobalParamsForSave()
+  const errors = validateGlobalParamsForSave()
+  if (errors.length > 0) {
+    alert('全局参数配置有误：\n' + errors.join('\n'))
+    return false
+  }
+  return true
+}
 
 // MCP Servers State
 interface MCPServer { id: string; name: string; url: string; enabled: boolean; description: string; testing?: boolean; testResult?: any }
@@ -514,6 +557,7 @@ const testMCPServer = async (index: number) => {
 }
 
 const saveMCPConfig = async () => {
+  if (!ensureGlobalParamsValid()) return
   savingMCP.value = true
   try {
     const cleanServers = mcpServers.value.map(s => ({ id: s.id, name: s.name, url: s.url, enabled: s.enabled, description: s.description }))
@@ -564,6 +608,7 @@ const saveGeneral = async () => {
 }
 
 const saveAiConfig = async () => {
+  if (!ensureGlobalParamsValid()) return
   savingAiConfig.value = true
   try {
     await axios.patch(`/api/projects/${projectId}/`, { extra_config: getExtraConfig() })
@@ -574,6 +619,7 @@ const saveAiConfig = async () => {
 }
 
 const saveGlobalParams = async () => {
+  if (!ensureGlobalParamsValid()) return
   savingGlobalParams.value = true
   try {
     await axios.patch(`/api/projects/${projectId}/`, { extra_config: getExtraConfig() })
@@ -584,6 +630,7 @@ const saveGlobalParams = async () => {
 }
 
 const saveWorkflowTags = async () => {
+  if (!ensureGlobalParamsValid()) return
   savingWorkflowTags.value = true
   try {
     workflowTags.value = workflowTags.value.filter(t => t.trim())
@@ -595,6 +642,7 @@ const saveWorkflowTags = async () => {
 }
 
 const saveAgentConfig = async () => {
+  if (!ensureGlobalParamsValid()) return
   savingAgentConfig.value = true
   try {
     await axios.patch(`/api/projects/${projectId}/`, { extra_config: getExtraConfig() })

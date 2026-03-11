@@ -643,48 +643,48 @@
                       v-model="templateDraft" 
                       class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 font-mono leading-relaxed"
                       rows="8"
-                      placeholder="例如：&#10;{{status_emoji}} 任务 {{task_name}} {{status_label}}&#10;&#10;仓库: {{params.repository}}&#10;内容: {{vars.news}}"
+                      placeholder="例如：&#10;${status_emoji} 任务 ${task_name} ${status_label}&#10;&#10;下载地址: ${build_android_result[&quot;apk_download_url&quot;]}&#10;分支: ${branch}"
                     ></textarea>
                 </div>
                 <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
                     <h4 class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">可用变量</h4>
                     <div class="grid grid-cols-2 gap-2 text-xs" v-pre>
                         <div class="flex items-center gap-2">
-                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">{{task_name}}</code>
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">${task_name}</code>
                             <span class="text-gray-500">任务名称</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">{{status}}</code>
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">${status}</code>
                             <span class="text-gray-500">原始状态</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">{{status_label}}</code>
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">${status_label}</code>
                             <span class="text-gray-500">中文状态</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">{{status_emoji}}</code>
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">${status_emoji}</code>
                             <span class="text-gray-500">状态图标</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">{{workflow_name}}</code>
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-600">${workflow_name}</code>
                             <span class="text-gray-500">工作流名称</span>
                         </div>
                         <div class="flex items-center gap-2 col-span-2 pt-2 border-t border-gray-200 mt-1">
-                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-green-600">{{params.参数名}}</code>
-                            <span class="text-gray-500">运行时输入参数（来自任务上下文）</span>
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-green-600">${变量名}</code>
+                            <span class="text-gray-500">运行时参数与流程变量均可直接通过变量名引用</span>
                         </div>
                         <div class="flex items-center gap-2 col-span-2 pt-2 border-t border-gray-200 mt-1">
-                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-purple-600">{{vars.变量名}}</code>
-                            <span class="text-gray-500">流程变量（通过 splice 传递的节点输出）</span>
+                            <code class="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-purple-600">${build_android_result["apk_download_url"]}</code>
+                            <span class="text-gray-500">支持对象/数组下标访问，语法与 bamboo splice 一致</span>
                         </div>
                     </div>
                 </div>
                 <div class="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
                     <h4 class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">使用说明</h4>
                     <ul class="text-xs text-gray-600 space-y-1.5 list-disc list-inside" v-pre>
-                        <li><b>输入参数</b>：任务创建时填写的参数，使用 <code class="text-green-600">{{params.参数名}}</code></li>
-                        <li><b>流程变量</b>：节点输出通过 splice 映射的变量，使用 <code class="text-purple-600">{{vars.变量名}}</code></li>
-                        <li>例如组件输出 content 映射到 ${news}，则模板中使用 <code class="text-purple-600">{{vars.news}}</code></li>
+                        <li><b>模板语法</b>：仅支持 <code class="text-green-600">${...}</code>，不支持 <code class="text-red-600">{{...}}</code></li>
+                        <li><b>变量引用</b>：直接使用变量名，如 <code class="text-purple-600">${branch}</code>、<code class="text-purple-600">${news}</code></li>
+                        <li><b>下标访问</b>：支持 <code class="text-purple-600">${obj["key"]}</code>、<code class="text-purple-600">${arr[0]}</code></li>
                         <li>留空则使用默认模板，仅显示任务状态信息</li>
                     </ul>
                 </div>
@@ -819,6 +819,11 @@ const isLoading = ref(false)
 const notifyTemplate = ref('')
 const showTemplateModal = ref(false)
 const templateDraft = ref('')
+const IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+const isValidIdentifier = (value: string): boolean => {
+    return IDENTIFIER_REGEX.test((value || '').trim())
+}
 
 const openTemplateModal = () => {
     templateDraft.value = notifyTemplate.value
@@ -828,6 +833,10 @@ const cancelTemplateModal = () => {
     showTemplateModal.value = false
 }
 const saveTemplateModal = () => {
+    if (templateDraft.value.includes('{{') || templateDraft.value.includes('}}')) {
+        alert('通知模板仅支持 ${...} 语法，不支持 {{...}}。')
+        return
+    }
     notifyTemplate.value = templateDraft.value
     showTemplateModal.value = false
 }
@@ -1344,6 +1353,10 @@ const validateWorkflowParamsForSave = (params: WorkflowParam[]): string[] => {
             errors.push(`${label} 未填写参数名称`)
             return
         }
+        if (!isValidIdentifier(param.key)) {
+            errors.push(`${label} 参数名称不合法：${param.key}（仅支持字母/数字/下划线，且不能数字开头）`)
+            return
+        }
         if (seen.has(param.key)) {
             errors.push(`${label} 与其他参数重名：${param.key}`)
             return
@@ -1383,6 +1396,33 @@ const validateWorkflowParamsForSave = (params: WorkflowParam[]): string[] => {
                 errors.push(`${label}（${param.key}）缺少仓库 Token`)
             }
         }
+    })
+
+    return errors
+}
+
+const validateOutputMappingKeys = (graph: any): string[] => {
+    const errors: string[] = []
+    const seen = new Set<string>()
+
+    const nodes = graph?.getNodes?.() || []
+    nodes.forEach((node: any) => {
+        const data = node?.getData?.() || {}
+        const outputs = Array.isArray(data.outputs) ? data.outputs : []
+        outputs.forEach((out: any, index: number) => {
+            const raw = String(out?.contextKey || '').trim()
+            if (!raw) return
+            const nodeLabel = data.label || node.id || `node#${index + 1}`
+            if (!isValidIdentifier(raw)) {
+                errors.push(`${nodeLabel} 输出变量名不合法：${raw}`)
+                return
+            }
+            if (seen.has(raw)) {
+                errors.push(`${nodeLabel} 输出变量名重复：${raw}`)
+                return
+            }
+            seen.add(raw)
+        })
     })
 
     return errors
@@ -1476,6 +1516,10 @@ const importFlowData = async () => {
 
 const handleSave = async (): Promise<boolean> => {
     if (!workflowName.value) return false
+    if (notifyTemplate.value.includes('{{') || notifyTemplate.value.includes('}}')) {
+        alert('通知模板仅支持 ${...} 语法，不支持 {{...}}。')
+        return false
+    }
     
     isSaving.value = true
     try {
@@ -1491,6 +1535,21 @@ const handleSave = async (): Promise<boolean> => {
         const graph = flowCanvasRef.value?.getGraph()
         if (!graph) {
             throw new Error('Graph not available')
+        }
+
+        const invalidEnabledGlobalParamKeys = projectParams.value
+            .filter((p) => enabledGlobalParams.value.includes(p.key))
+            .map((p) => String(p.key || '').trim())
+            .filter((key) => !isValidIdentifier(key))
+        if (invalidEnabledGlobalParamKeys.length > 0) {
+            alert('全局参数名称不合法：\n' + Array.from(new Set(invalidEnabledGlobalParamKeys)).join('\n'))
+            return false
+        }
+
+        const outputMappingErrors = validateOutputMappingKeys(graph)
+        if (outputMappingErrors.length > 0) {
+            alert('输出变量映射配置有误：\n' + outputMappingErrors.join('\n'))
+            return false
         }
         
         // Build pipeline tree from graph with params
