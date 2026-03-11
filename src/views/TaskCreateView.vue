@@ -209,6 +209,19 @@
                                 <div v-else class="text-xs text-orange-500">未配置可选项，可在流程参数详情页中补充选项。</div>
                             </template>
 
+                            <template v-else-if="param.inputType === 'toggle'">
+                                <label class="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                                    <input
+                                      v-model="param.runtimeValue"
+                                      type="checkbox"
+                                      :true-value="1"
+                                      :false-value="0"
+                                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span>{{ Number(param.runtimeValue) === 1 ? '开启 (1)' : '关闭 (0)' }}</span>
+                                </label>
+                            </template>
+
                             <template v-else-if="param.inputType === 'git-branch'">
                                 <div class="space-y-2">
                                     <div class="flex items-center gap-2">
@@ -521,7 +534,7 @@ const taskTypes = [
     { label: 'Webhook', value: 'webhook' }
 ]
 
-type ParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select'
+type ParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select' | 'toggle'
 
 interface ParamOption {
     value: string
@@ -557,6 +570,7 @@ const paramTypeLabels: Record<ParamInputType, string> = {
     'git-branch': 'Git 分支',
     'single-select': '单选',
     'multi-select': '多选',
+    toggle: '开关',
 }
 
 interface FeishuUserOption {
@@ -593,10 +607,19 @@ const isValid = computed(() => {
 })
 
 const normalizeInputType = (inputType: any): ParamInputType => {
-    if (inputType === 'git-branch' || inputType === 'single-select' || inputType === 'multi-select') {
+    if (inputType === 'git-branch' || inputType === 'single-select' || inputType === 'multi-select' || inputType === 'toggle') {
         return inputType
     }
     return 'text'
+}
+
+const normalizeToggleValue = (value: any): 0 | 1 => {
+    if (value === 1 || value === '1' || value === true) {
+        return 1
+    }
+
+    const normalized = String(value ?? '').trim().toLowerCase()
+    return normalized === 'true' || normalized === 'yes' || normalized === 'on' ? 1 : 0
 }
 
 const normalizeParamOptions = (raw: any): ParamOption[] => {
@@ -636,6 +659,10 @@ const normalizeParamValueByType = (inputType: ParamInputType, value: any, option
         return list.filter((v) => optionSet.has(v))
     }
 
+    if (inputType === 'toggle') {
+        return normalizeToggleValue(value)
+    }
+
     const normalized = String(value ?? '')
     if (inputType === 'single-select' && normalized) {
         const optionSet = new Set(options.map((opt) => opt.value))
@@ -673,6 +700,9 @@ const buildParamItem = (raw: any, source: 'global' | 'workflow'): ParamItem => {
 }
 
 const formatParamDefaultValue = (param: ParamItem) => {
+    if (param.inputType === 'toggle') {
+        return Number(param.value) === 1 ? '开启 (1)' : '关闭 (0)'
+    }
     if (Array.isArray(param.value)) {
         return param.value.length ? param.value.join(', ') : '[]'
     }
@@ -703,6 +733,9 @@ const toggleMultiParamValue = (param: ParamItem, value: string) => {
 const getContextValue = (param: ParamItem) => {
     if (param.inputType === 'multi-select') {
         return Array.isArray(param.runtimeValue) ? param.runtimeValue.map((v: any) => String(v)) : []
+    }
+    if (param.inputType === 'toggle') {
+        return normalizeToggleValue(param.runtimeValue)
     }
     return String(param.runtimeValue ?? '')
 }

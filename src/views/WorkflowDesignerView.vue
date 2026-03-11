@@ -520,6 +520,22 @@
                       </div>
                   </template>
 
+                  <template v-else-if="currentWorkflowParam.input_type === 'toggle'">
+                      <div class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">默认值</label>
+                          <label class="inline-flex items-center gap-2 rounded border border-gray-200 px-2 py-1.5 text-xs text-gray-700">
+                              <input
+                                v-model="currentWorkflowParam.value"
+                                type="checkbox"
+                                :true-value="1"
+                                :false-value="0"
+                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span>{{ Number(currentWorkflowParam.value) === 1 ? '开启 (1)' : '关闭 (0)' }}</span>
+                          </label>
+                      </div>
+                  </template>
+
                   <template v-else>
                       <div class="space-y-1">
                           <label class="text-[11px] font-medium text-gray-500">默认值</label>
@@ -905,7 +921,7 @@ const toggleParam = (key: string) => {
 }
 
 // Workflow Local Params State
-type WorkflowParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select'
+type WorkflowParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select' | 'toggle'
 
 interface WorkflowParamOption {
     value: string
@@ -931,6 +947,7 @@ const workflowParamTypes: Array<{ value: WorkflowParamInputType; label: string }
     { value: 'git-branch', label: 'Git 分支' },
     { value: 'single-select', label: '单选' },
     { value: 'multi-select', label: '多选' },
+    { value: 'toggle', label: '开关' },
 ]
 
 const createDefaultWorkflowParam = (): WorkflowParam => ({
@@ -944,6 +961,15 @@ const createDefaultWorkflowParam = (): WorkflowParam => ({
         token: '',
     },
 })
+
+const normalizeToggleValue = (value: any): 0 | 1 => {
+    if (value === 1 || value === '1' || value === true) {
+        return 1
+    }
+
+    const normalized = String(value ?? '').trim().toLowerCase()
+    return normalized === 'true' || normalized === 'yes' || normalized === 'on' ? 1 : 0
+}
 
 const normalizeWorkflowParam = (raw: any): WorkflowParam => {
     const normalizedType: WorkflowParamInputType = workflowParamTypes.some((x) => x.value === raw?.input_type)
@@ -960,6 +986,8 @@ const normalizeWorkflowParam = (raw: any): WorkflowParam => {
     let normalizedValue: any = raw?.value ?? ''
     if (normalizedType === 'multi-select') {
         normalizedValue = Array.isArray(raw?.value) ? raw.value.map((v: any) => String(v)) : []
+    } else if (normalizedType === 'toggle') {
+        normalizedValue = normalizeToggleValue(raw?.value)
     } else {
         normalizedValue = String(raw?.value ?? '')
     }
@@ -1016,6 +1044,11 @@ const onWorkflowParamTypeChange = (param: WorkflowParam) => {
         }
         const validValues = new Set(param.options.map((opt) => String(opt.value || '').trim()).filter(Boolean))
         param.value = param.value.map((v: any) => String(v)).filter((v: string) => validValues.has(v))
+        return
+    }
+
+    if (param.input_type === 'toggle') {
+        param.value = normalizeToggleValue(param.value)
         return
     }
 
@@ -1242,6 +1275,8 @@ const normalizeWorkflowParamsForSave = (): WorkflowParam[] => {
             const validValues = new Set(param.options.map((opt) => opt.value))
             const values = Array.isArray(param.value) ? param.value.map((v: any) => String(v)) : []
             param.value = values.filter((v: string) => validValues.has(v))
+        } else if (param.input_type === 'toggle') {
+            param.value = normalizeToggleValue(param.value)
         } else {
             param.value = String(param.value ?? '')
             if (param.input_type === 'single-select') {
