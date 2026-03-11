@@ -84,7 +84,7 @@
       </div>
 
       <!-- Right Sidebar -->
-      <div v-show="activePanel" class="w-80 bg-white border-l border-gray-200 flex flex-col shadow-lg shrink-0">
+      <div v-show="activePanel" class="w-[30rem] bg-white border-l border-gray-200 flex flex-col shadow-lg shrink-0">
           <!-- Sidebar Header -->
           <div class="h-10 border-b border-gray-100 flex items-center justify-between px-4">
               <span class="font-medium text-gray-700 capitalize">{{ panelTitles[activePanel || ''] || activePanel }}</span>
@@ -555,10 +555,45 @@
           </div>
           
           <!-- Content: JSON -->
-          <div v-else-if="activePanel === 'json'" class="flex-1 p-4 overflow-y-auto">
-               <div class="text-xs font-mono bg-gray-50 p-2 rounded border border-gray-100 whitespace-pre-wrap break-all">
-                  {{ JSON.stringify({ ...graphData, global_params_enabled: enabledGlobalParams }, null, 2) }}
-               </div>
+          <div v-else-if="activePanel === 'json'" class="flex-1 p-4 overflow-y-auto space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                  <p class="text-xs text-gray-500 leading-relaxed">
+                      可拷贝当前流程数据，也可以直接粘贴 JSON 后导入到画布。
+                  </p>
+                  <div class="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                        @click="copyFlowData"
+                      >
+                          拷贝
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="isReadOnly"
+                        @click="importFlowData"
+                      >
+                          导入
+                      </button>
+                  </div>
+              </div>
+
+              <p
+                v-if="jsonFeedback"
+                class="text-xs"
+                :class="jsonFeedbackType === 'error' ? 'text-red-500' : 'text-emerald-600'"
+              >
+                  {{ jsonFeedback }}
+              </p>
+
+              <textarea
+                v-model="jsonDraft"
+                class="w-full min-h-[24rem] px-3 py-2 text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 leading-relaxed"
+                :readonly="isReadOnly"
+                spellcheck="false"
+                placeholder="在这里查看、拷贝或粘贴流程 JSON"
+              ></textarea>
           </div>
           
           <!-- ... remaining panels ... -->
@@ -899,6 +934,10 @@ watch(activePanel, (newVal, oldVal) => {
             refreshComponentVars()
         })
     }
+    if (newVal === 'json') {
+        syncJsonDraft()
+        jsonFeedback.value = ''
+    }
 })
 watch(selectedProjectId, () => {
     fetchProjectMembers()
@@ -1014,6 +1053,10 @@ const currentWorkflowParam = computed<WorkflowParam | null>(() => {
     }
     return workflowParams.value[selectedWorkflowParamIndex.value] || null
 })
+
+const jsonDraft = ref('')
+const jsonFeedback = ref('')
+const jsonFeedbackType = ref<'success' | 'error'>('success')
 
 const getWorkflowParamDisplayName = (param: WorkflowParam, index: number) => {
     const key = String(param.key || '').trim()
@@ -1345,6 +1388,92 @@ const validateWorkflowParamsForSave = (params: WorkflowParam[]): string[] => {
     return errors
 }
 
+const buildCurrentGraphData = (paramsOverride?: WorkflowParam[]) => {
+    const graph = flowCanvasRef.value?.getGraph()
+    const nextGraphData: any = graph
+        ? graph.toJSON()
+        : JSON.parse(JSON.stringify(graphData.value || {}))
+
+    nextGraphData.global_params_enabled = [...enabledGlobalParams.value]
+    nextGraphData.workflow_params = paramsOverride ?? normalizeWorkflowParamsForSave()
+
+    return nextGraphData
+}
+
+const syncJsonDraft = () => {
+    const currentGraphData = buildCurrentGraphData()
+    graphData.value = currentGraphData
+    jsonDraft.value = JSON.stringify(currentGraphData, null, 2)
+}
+
+const applyImportedGraphData = async (rawData: any) => {
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+        throw new Error('流程数据必须是 JSON 对象')
+    }
+    if (!Array.isArray(rawData.cells)) {
+        throw new Error('流程数据缺少 cells 数组')
+    }
+
+    const normalizedParams = Array.isArray(rawData.workflow_params)
+        ? rawData.workflow_params.map((param: any) => normalizeWorkflowParam(param))
+        : []
+
+    graphData.value = rawData
+    enabledGlobalParams.value = Array.isArray(rawData.global_params_enabled)
+        ? rawData.global_params_enabled.map((key: any) => String(key))
+        : []
+    workflowParams.value = normalizedParams
+    selectedWorkflowParamIndex.value = null
+
+    await nextTick()
+    if (!flowCanvasRef.value) {
+        throw new Error('画布尚未就绪，无法导入')
+    }
+
+    flowCanvasRef.value.loadGraph(rawData)
+    jsonDraft.value = JSON.stringify(rawData, null, 2)
+    jsonFeedbackType.value = 'success'
+    jsonFeedback.value = '流程数据已导入到画布，当前改动尚未保存。'
+    lastSaved.value = ''
+
+    nextTick(() => {
+        refreshComponentVars()
+    })
+}
+
+const copyFlowData = async () => {
+    try {
+        syncJsonDraft()
+        if (!navigator?.clipboard?.writeText) {
+            throw new Error('当前环境不支持剪贴板写入')
+        }
+        await navigator.clipboard.writeText(jsonDraft.value)
+        jsonFeedbackType.value = 'success'
+        jsonFeedback.value = '当前流程数据已复制到剪贴板。'
+    } catch (e: any) {
+        console.error('Failed to copy flow data:', e)
+        jsonFeedbackType.value = 'error'
+        jsonFeedback.value = `复制失败：${e?.message || '未知错误'}`
+    }
+}
+
+const importFlowData = async () => {
+    if (isReadOnly.value) {
+        jsonFeedbackType.value = 'error'
+        jsonFeedback.value = '当前为只读模式，切换到编辑后才能导入。'
+        return
+    }
+
+    try {
+        const parsed = JSON.parse(jsonDraft.value)
+        await applyImportedGraphData(parsed)
+    } catch (e: any) {
+        console.error('Failed to import flow data:', e)
+        jsonFeedbackType.value = 'error'
+        jsonFeedback.value = `导入失败：${e?.message || '请输入合法的流程 JSON'}`
+    }
+}
+
 const handleSave = async (): Promise<boolean> => {
     if (!workflowName.value) return false
     
@@ -1391,12 +1520,11 @@ const handleSave = async (): Promise<boolean> => {
         }
         
         // Get graph JSON data for storage
-        const graphDataJSON: any = graph.toJSON()
-        
-        // MERGE global_params_enabled into graphData
-        graphDataJSON.global_params_enabled = enabledGlobalParams.value
-        // MERGE workflow_params
-        graphDataJSON.workflow_params = normalizedWorkflowParams
+        const graphDataJSON = buildCurrentGraphData(normalizedWorkflowParams)
+        graphData.value = graphDataJSON
+        if (activePanel.value === 'json') {
+            jsonDraft.value = JSON.stringify(graphDataJSON, null, 2)
+        }
 
         const payload = {
             name: workflowName.value,
@@ -1451,6 +1579,7 @@ const loadWorkflow = async (id: string, isClone = false) => {
         visibleUserIds.value = workflow.visible_user_ids || []
 
         graphData.value = workflow.graph_data || {}
+        jsonDraft.value = JSON.stringify(graphData.value, null, 2)
         
         // Load enabled global params from graph_data
         if (workflow.graph_data && workflow.graph_data.global_params_enabled) {
