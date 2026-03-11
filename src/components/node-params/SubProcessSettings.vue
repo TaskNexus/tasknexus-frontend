@@ -52,6 +52,12 @@ interface Param {
     description?: string
 }
 
+interface OutputCandidate {
+    key: string
+    name: string
+    type: string
+}
+
 const props = defineProps<{
     visible: boolean
     modelValue: string | number | null
@@ -62,6 +68,7 @@ const emit = defineEmits<{
     'update:modelValue': [value: string | number]
     'update:paramValues': [key: string, value: any]
     'paramsLoaded': [params: Param[]]
+    'subprocessOutputsLoaded': [outputs: OutputCandidate[]]
 }>()
 
 const workflows = ref<Workflow[]>([])
@@ -79,19 +86,54 @@ const fetchWorkflows = async () => {
     }
 }
 
-const fetchParams = async (workflowId: string | number) => {
+const fetchParams = async (workflowId: string | number | null) => {
     if (!workflowId) {
         params.value = []
+        emit('paramsLoaded', [])
+        emit('subprocessOutputsLoaded', [])
         return
     }
     try {
         const resp = await axios.get(`/api/workflows/${workflowId}/`)
         const graphData = resp.data.graph_data || {}
+        const pipelineTree = resp.data.pipeline_tree || {}
         params.value = graphData.workflow_params || []
+        const outputCandidates = extractSubprocessOutputs(pipelineTree.data?.outputs)
         emit('paramsLoaded', params.value)
+        emit('subprocessOutputsLoaded', outputCandidates)
     } catch (e) {
         console.error("Failed to load sub workflow", e)
+        params.value = []
+        emit('paramsLoaded', [])
+        emit('subprocessOutputsLoaded', [])
     }
+}
+
+const normalizeOutputKey = (value: unknown): string => {
+    if (typeof value !== 'string') return ''
+    return value.trim()
+}
+
+const humanizeOutputName = (key: string): string => {
+    const matched = key.match(/^\$\{(.+)\}$/)
+    return matched ? matched[1] : key
+}
+
+const extractSubprocessOutputs = (rawOutputs: unknown): OutputCandidate[] => {
+    let outputKeys: string[] = []
+
+    if (Array.isArray(rawOutputs)) {
+        outputKeys = rawOutputs.map((item) => normalizeOutputKey(item)).filter(Boolean)
+    } else if (rawOutputs && typeof rawOutputs === 'object') {
+        outputKeys = Object.keys(rawOutputs as Record<string, unknown>).map((key) => normalizeOutputKey(key)).filter(Boolean)
+    }
+
+    const deduped = Array.from(new Set(outputKeys))
+    return deduped.map((key) => ({
+        key,
+        name: humanizeOutputName(key),
+        type: 'subprocess-output'
+    }))
 }
 
 const handleChange = (event: Event) => {
@@ -105,9 +147,7 @@ const updateParamValue = (key: string, value: any) => {
 }
 
 watch(() => props.modelValue, (newVal) => {
-    if (newVal) {
-        fetchParams(newVal)
-    }
+    fetchParams(newVal)
 }, { immediate: true })
 
 onMounted(() => {

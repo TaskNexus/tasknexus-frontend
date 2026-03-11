@@ -29,6 +29,7 @@
             :param-values="nodeInputs"
             @update:modelValue="(val) => { nodeInputs['workflow_id'] = val; updateInputs(); }"
             @update:paramValues="(key, val) => { nodeInputs[key] = val; updateInputs(); }"
+            @subprocessOutputsLoaded="handleSubprocessOutputsLoaded"
         />
 
         <InputParamsSettings
@@ -40,16 +41,19 @@
         />
 
         <OutputParamsSettings
-            :outputs="nodeData.componentOutputs || []"
+            :outputs="effectiveOutputs"
             :mappings="nodeOutputMappings"
             @update:mappings="(mappings) => { nodeOutputMappings = mappings; updateOutputs(); }"
         />
+        <p v-if="subprocessCleanupNotice" class="text-xs text-amber-600">
+            {{ subprocessCleanupNotice }}
+        </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import axios from 'axios'
 import {
     SubProcessSettings,
@@ -67,6 +71,8 @@ const props = defineProps<{
 const nodeData = ref<any>({})
 const nodeInputs = ref<any>({})
 const nodeOutputMappings = ref<Record<string, string>>({})
+const subprocessOutputs = ref<Array<{ key: string; name: string; type: string }>>([])
+const subprocessCleanupNotice = ref('')
 
 // AI Model Configuration
 interface ModelGroup {
@@ -78,6 +84,18 @@ const aiModelGroups = ref<ModelGroup[]>([])
 
 // Component Definitions Cache
 const componentDefinitions = ref<any[]>([])
+const builtinSubprocessOutputKeys = new Set(['_loop', '_inner_loop'])
+
+const isSubProcessNode = computed(() => {
+    return nodeData.value.type === 'SUBPROCESS' || nodeData.value.type === 'subprocess'
+})
+
+const effectiveOutputs = computed(() => {
+    if (isSubProcessNode.value) {
+        return subprocessOutputs.value
+    }
+    return nodeData.value.componentOutputs || []
+})
 
 const fetchAiConfig = async () => {
     if (!props.projectId) return
@@ -109,6 +127,8 @@ const syncFromNode = () => {
     const data = props.node.getData() || {}
     nodeData.value = { ...data }
     nodeInputs.value = { ...data.inputs }
+    subprocessOutputs.value = []
+    subprocessCleanupNotice.value = ''
     
     // Sync output mappings from node's outputs array
     nodeOutputMappings.value = {}
@@ -127,6 +147,44 @@ const syncFromNode = () => {
     
     // Auto-update component schema if outdated
     updateSchemaFromLatest()
+}
+
+const cleanupInvalidSubprocessMappings = (allowedOutputs: Array<{ key: string }>) => {
+    if (!isSubProcessNode.value) return
+
+    const allowedKeys = new Set<string>([
+        ...Array.from(builtinSubprocessOutputKeys),
+        ...allowedOutputs
+            .map((output) => (typeof output.key === 'string' ? output.key.trim() : ''))
+            .filter(Boolean)
+    ])
+
+    const cleanedMappings: Record<string, string> = {}
+    const removedKeys: string[] = []
+    let changed = false
+
+    for (const [sourceKey, contextKey] of Object.entries(nodeOutputMappings.value)) {
+        if (allowedKeys.has(sourceKey)) {
+            cleanedMappings[sourceKey] = contextKey
+        } else {
+            changed = true
+            removedKeys.push(sourceKey)
+        }
+    }
+
+    if (!changed) {
+        subprocessCleanupNotice.value = ''
+        return
+    }
+
+    nodeOutputMappings.value = cleanedMappings
+    subprocessCleanupNotice.value = `已移除与当前子流程不匹配的输出映射：${removedKeys.join(', ')}`
+    updateOutputs()
+}
+
+const handleSubprocessOutputsLoaded = (outputs: Array<{ key: string; name: string; type: string }>) => {
+    subprocessOutputs.value = outputs
+    cleanupInvalidSubprocessMappings(outputs)
 }
 
 const updateSchemaFromLatest = () => {
