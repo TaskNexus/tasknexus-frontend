@@ -196,7 +196,7 @@
                     class="w-full flex items-center justify-between px-3 py-2 border border-gray-200 rounded text-sm hover:border-blue-400 hover:bg-blue-50/50 transition-colors group"
                   >
                       <span class="text-gray-500 group-hover:text-blue-600 truncate">
-                          {{ notifyTemplate ? '已配置自定义模板' : '使用默认模板' }}
+                          {{ hasCustomNotifyTemplates ? '已配置状态模板' : '使用默认模板' }}
                       </span>
                       <Edit3 class="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-500 shrink-0 ml-2" />
                   </button>
@@ -637,13 +637,27 @@
             </div>
             <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 <div>
-                    <label class="text-sm font-medium text-gray-700 mb-1.5 block">模板内容</label>
-                    <p class="text-xs text-gray-400 mb-2">留空则使用默认模板。任务完成/失败/撤销时将按此模板发送通知。</p>
+                    <label class="text-sm font-medium text-gray-700 mb-2 block">状态</label>
+                    <div class="flex items-center gap-2">
+                        <button
+                          v-for="status in NOTIFY_STATUSES"
+                          :key="status"
+                          @click="activeTemplateStatus = status"
+                          class="px-3 py-1.5 text-xs rounded-md border transition-colors"
+                          :class="activeTemplateStatus === status ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+                        >
+                            {{ notifyStatusLabelMap[status] }}
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700 mb-1.5 block">模板内容（{{ notifyStatusLabelMap[activeTemplateStatus] }}）</label>
+                    <p class="text-xs text-gray-400 mb-2">当前状态模板留空则使用系统默认模板。</p>
                     <textarea 
-                      v-model="templateDraft" 
+                      v-model="templateDraft[activeTemplateStatus]"
                       class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 font-mono leading-relaxed"
                       rows="8"
-                      placeholder="例如：&#10;${status_emoji} 任务 ${task_name} ${status_label}&#10;&#10;下载地址: ${build_android_result[&quot;apk_download_url&quot;]}&#10;分支: ${branch}"
+                      :placeholder="notifyTemplatePlaceholderMap[activeTemplateStatus]"
                     ></textarea>
                 </div>
                 <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
@@ -685,16 +699,16 @@
                         <li><b>模板语法</b>：仅支持 <code class="text-green-600">${...}</code>，不支持 <code class="text-red-600">{{...}}</code></li>
                         <li><b>变量引用</b>：直接使用变量名，如 <code class="text-purple-600">${branch}</code>、<code class="text-purple-600">${news}</code></li>
                         <li><b>下标访问</b>：支持 <code class="text-purple-600">${obj["key"]}</code>、<code class="text-purple-600">${arr[0]}</code></li>
-                        <li>留空则使用默认模板，仅显示任务状态信息</li>
+                        <li>当前状态模板留空则使用默认模板，仅显示任务状态信息</li>
                     </ul>
                 </div>
             </div>
             <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
                 <button 
-                  v-if="templateDraft"
-                  @click="templateDraft = ''" 
+                  v-if="templateDraft[activeTemplateStatus]"
+                  @click="templateDraft[activeTemplateStatus] = ''"
                   class="text-xs text-red-500 hover:text-red-700"
-                >清空模板（使用默认）</button>
+                >清空当前状态模板</button>
                 <span v-else></span>
                 <div class="flex space-x-3">
                     <button @click="cancelTemplateModal" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
@@ -816,9 +830,48 @@ const visibilityRoleOptions = ['OWNER', 'MAINTAINER', 'DEVELOPER', 'REPORTER'] a
 const visibleRoles = ref<string[]>([])
 const visibleUserIds = ref<number[]>([])
 const isLoading = ref(false)
-const notifyTemplate = ref('')
+type NotifyStatus = 'FINISHED' | 'FAILED' | 'REVOKED'
+const NOTIFY_STATUSES: NotifyStatus[] = ['FINISHED', 'FAILED', 'REVOKED']
+const notifyStatusLabelMap: Record<NotifyStatus, string> = {
+    FINISHED: '执行完成',
+    FAILED: '执行失败',
+    REVOKED: '已撤销',
+}
+const notifyTemplatePlaceholderMap: Record<NotifyStatus, string> = {
+    FINISHED: '例如：\n${status_emoji} 任务 ${task_name} ${status_label}\n\n工作流: ${workflow_name}',
+    FAILED: '例如：\n${status_emoji} 任务 ${task_name} ${status_label}\n\n工作流: ${workflow_name}',
+    REVOKED: '例如：\n${status_emoji} 任务 ${task_name} ${status_label}\n\n工作流: ${workflow_name}',
+}
+const createEmptyNotifyTemplates = (): Record<NotifyStatus, string> => ({
+    FINISHED: '',
+    FAILED: '',
+    REVOKED: '',
+})
+const sanitizeNotifyTemplates = (value: unknown): Record<NotifyStatus, string> => {
+    const sanitized = createEmptyNotifyTemplates()
+    if (!value || typeof value !== 'object') return sanitized
+    const source = value as Record<string, unknown>
+    for (const status of NOTIFY_STATUSES) {
+        const template = source[status]
+        sanitized[status] = typeof template === 'string' ? template : ''
+    }
+    return sanitized
+}
+const copyNotifyTemplates = (
+    target: Record<NotifyStatus, string>,
+    source: Record<NotifyStatus, string>,
+) => {
+    for (const status of NOTIFY_STATUSES) {
+        target[status] = source[status] || ''
+    }
+}
+const notifyTemplates = reactive<Record<NotifyStatus, string>>(createEmptyNotifyTemplates())
 const showTemplateModal = ref(false)
-const templateDraft = ref('')
+const activeTemplateStatus = ref<NotifyStatus>('FINISHED')
+const templateDraft = reactive<Record<NotifyStatus, string>>(createEmptyNotifyTemplates())
+const hasCustomNotifyTemplates = computed(() =>
+    NOTIFY_STATUSES.some((status) => (notifyTemplates[status] || '').trim().length > 0)
+)
 const IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 const isValidIdentifier = (value: string): boolean => {
@@ -826,18 +879,22 @@ const isValidIdentifier = (value: string): boolean => {
 }
 
 const openTemplateModal = () => {
-    templateDraft.value = notifyTemplate.value
+    copyNotifyTemplates(templateDraft, notifyTemplates)
+    activeTemplateStatus.value = 'FINISHED'
     showTemplateModal.value = true
 }
 const cancelTemplateModal = () => {
     showTemplateModal.value = false
 }
 const saveTemplateModal = () => {
-    if (templateDraft.value.includes('{{') || templateDraft.value.includes('}}')) {
-        alert('通知模板仅支持 ${...} 语法，不支持 {{...}}。')
-        return
+    for (const status of NOTIFY_STATUSES) {
+        const template = templateDraft[status]
+        if (template.includes('{{') || template.includes('}}')) {
+            alert(`通知模板仅支持 \${...} 语法，不支持 {{...}}（${notifyStatusLabelMap[status]}）。`)
+            return
+        }
     }
-    notifyTemplate.value = templateDraft.value
+    copyNotifyTemplates(notifyTemplates, templateDraft)
     showTemplateModal.value = false
 }
 
@@ -1516,9 +1573,12 @@ const importFlowData = async () => {
 
 const handleSave = async (): Promise<boolean> => {
     if (!workflowName.value) return false
-    if (notifyTemplate.value.includes('{{') || notifyTemplate.value.includes('}}')) {
-        alert('通知模板仅支持 ${...} 语法，不支持 {{...}}。')
-        return false
+    for (const status of NOTIFY_STATUSES) {
+        const template = notifyTemplates[status]
+        if (template.includes('{{') || template.includes('}}')) {
+            alert(`通知模板仅支持 \${...} 语法，不支持 {{...}}（${notifyStatusLabelMap[status]}）。`)
+            return false
+        }
     }
     
     isSaving.value = true
@@ -1591,7 +1651,10 @@ const handleSave = async (): Promise<boolean> => {
             project: selectedProjectId.value || null,
             graph_data: graphDataJSON,
             pipeline_tree: pipelineTree,
-            notify_template: notifyTemplate.value,
+            notify_templates: NOTIFY_STATUSES.reduce((acc, status) => {
+                acc[status] = notifyTemplates[status]
+                return acc
+            }, {} as Record<NotifyStatus, string>),
             visible_roles: visibleRoles.value,
             visible_user_ids: visibleUserIds.value
         }
@@ -1633,7 +1696,7 @@ const loadWorkflow = async (id: string, isClone = false) => {
              workflowTags.value = workflow.tags || []
              selectedProjectId.value = workflow.project || ''
         }
-        notifyTemplate.value = workflow.notify_template || ''
+        copyNotifyTemplates(notifyTemplates, sanitizeNotifyTemplates(workflow.notify_templates))
         visibleRoles.value = workflow.visible_roles || []
         visibleUserIds.value = workflow.visible_user_ids || []
 
