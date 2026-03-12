@@ -19,6 +19,9 @@
               {{ t('clientAgents.platform') }}
             </th>
             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              当前版本
+            </th>
+            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               {{ t('clientAgents.lastHeartbeat') }}
             </th>
             <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -57,10 +60,22 @@
               {{ agent.platform || '-' }}
             </td>
             <td class="px-6 py-4 text-sm text-gray-600">
+              {{ agent.agent_version || '-' }}
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-600">
               {{ formatTime(agent.last_heartbeat) }}
             </td>
             <td class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-2">
+                <button
+                  @click="triggerSelfUpdate(agent)"
+                  :disabled="agent.status !== 'ONLINE' || updatingAgentId === agent.id"
+                  class="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="更新 Agent"
+                >
+                  <Loader2 v-if="updatingAgentId === agent.id" class="w-4 h-4 animate-spin" />
+                  <Download v-else class="w-4 h-4" />
+                </button>
                 <button
                   @click="emit('select-agent', agent.id)"
                   class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -86,7 +101,7 @@
             </td>
           </tr>
           <tr v-if="agents.length === 0">
-            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
               <Monitor class="w-12 h-12 mx-auto mb-4 text-gray-300" />
               <p>{{ t('clientAgents.noAgents') }}</p>
               <p class="text-sm mt-2">Agent 会在首次连接时自动注册</p>
@@ -280,6 +295,7 @@ interface ClientAgent {
   last_heartbeat: string | null
   hostname: string
   platform: string
+  agent_version: string
   ip_address: string
   description: string
   workspaces: AgentWorkspace[]
@@ -305,6 +321,7 @@ const pageSize = ref(parsePageParam(route.query.page_size, 20))
 const totalCount = ref(0)
 const showEditDialog = ref(false)
 const editingAgentId = ref<number | null>(null)
+const updatingAgentId = ref<number | null>(null)
 
 const form = reactive({
   name: '',
@@ -525,6 +542,26 @@ const deleteAgent = async () => {
     fetchAgents()
   } catch (error) {
     console.error('Failed to delete agent:', error)
+  }
+}
+
+const triggerSelfUpdate = async (agent: ClientAgent) => {
+  if (agent.status !== 'ONLINE' || updatingAgentId.value !== null) return
+
+  const confirmed = window.confirm(`确认更新 Agent "${agent.name}" 到最新稳定版本？`)
+  if (!confirmed) return
+
+  updatingAgentId.value = agent.id
+  try {
+    const response = await axios.post(`/api/client-agents/agents/${agent.id}/self-update/`)
+    const taskId = response.data?.task_id
+    alert(`更新任务已下发 Agent 会自动下载更新并重启。`)
+  } catch (error: any) {
+    const msg = error?.response?.data?.error || '下发更新任务失败'
+    alert(msg)
+    console.error('Failed to trigger self update:', error)
+  } finally {
+    updatingAgentId.value = null
   }
 }
 
