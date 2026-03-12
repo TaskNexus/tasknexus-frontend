@@ -193,6 +193,10 @@ const hasEnumOptions = (input: InputDef): boolean => {
     return enumOptions(input).length > 0
 }
 
+function updateValue(key: string, value: any) {
+    emit('update:values', key, value)
+}
+
 const ensureSelectDefaults = () => {
     for (const input of props.inputs || []) {
         if (!(input.schema?.param_type === 'select' || hasEnumOptions(input))) {
@@ -224,8 +228,4 @@ watch(
     },
     { deep: true }
 )
-
-const updateValue = (key: string, value: any) => {
-    emit('update:values', key, value)
-}
 </script>
