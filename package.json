@@ -16,12 +16,18 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/language": "^6.11.3",
+    "@codemirror/legacy-modes": "^6.5.1",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.6",
     "@antv/x6": "^3.1.4",
     "@antv/x6-vue-shape": "^3.0.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/markdown-it": "^14.1.2",
     "@vue-js-cron/light": "^5.1.1",
     "axios": "^1.13.2",
+    "codemirror": "^6.0.2",
     "cronstrue": "^3.13.0",
     "highlight.js": "^11.11.1",
     "lucide-vue-next": "^0.562.0",

@@ -2,7 +2,7 @@
     <section v-if="inputs && inputs.length > 0" class="space-y-3">
         <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">{{ $t('language.inputParams') }}</h4>
 
-        <div v-for="input in inputs" :key="input.key" class="space-y-1">
+        <div v-for="input in visibleInputs" :key="input.key" class="space-y-1">
             <label class="text-xs font-medium text-gray-600">
                 {{ input.name }} <span v-if="input.required" class="text-red-500">*</span>
             </label>
@@ -37,6 +37,30 @@
                 v-else-if="input.schema?.param_type === 'textarea'"
                 :model-value="values[input.key] || ''"
                 placeholder="Enter text content ..."
+                @update:model-value="(val) => updateValue(input.key, val)"
+            />
+
+            <!-- Select -->
+            <select
+                v-else-if="input.schema?.param_type === 'select' || hasEnumOptions(input)"
+                :value="values[input.key] || ''"
+                class="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
+                @change="(event) => updateValue(input.key, (event.target as HTMLSelectElement).value)"
+            >
+                <option value="" disabled>请选择</option>
+                <option
+                    v-for="option in enumOptions(input)"
+                    :key="String(option)"
+                    :value="String(option)"
+                >
+                    {{ option }}
+                </option>
+            </select>
+
+            <!-- Code Editor -->
+            <CodeEditorInput
+                v-else-if="input.schema?.param_type === 'code_editor'"
+                :model-value="values[input.key] || { language: 'shell', content: '' }"
                 @update:model-value="(val) => updateValue(input.key, val)"
             />
 
@@ -81,13 +105,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import {
     ModelGroupSelect,
     ModelNameSelect,
     UserMultiSelect,
     KeyValueInput,
     StringTextarea,
+    CodeEditorInput,
     BooleanCheckbox,
     DefaultTextInput,
     ObjectArrayInput
@@ -100,6 +125,8 @@ interface InputDef {
     required: boolean
     schema?: {
         param_type?: string
+        enum?: any[]
+        visible_when?: Record<string, any>
         [key: string]: any
     }
 }
@@ -115,6 +142,7 @@ const props = defineProps<{
     values: Record<string, any>
     projectId?: number | string
     modelGroups?: ModelGroup[]
+    hiddenKeys?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -131,6 +159,71 @@ const availableModels = computed(() => {
     const group = (props.modelGroups || []).find(g => g.title === groupName)
     return group ? group.models.filter(m => m.enabled) : []
 })
+
+const matchesVisibleWhen = (visibleWhen: Record<string, any> | undefined): boolean => {
+    if (!visibleWhen || typeof visibleWhen !== 'object') {
+        return true
+    }
+
+    return Object.entries(visibleWhen).every(([depKey, expected]) => {
+        const actual = props.values?.[depKey]
+        if (Array.isArray(expected)) {
+            return expected.map((item) => String(item)).includes(String(actual))
+        }
+        return String(actual ?? '') === String(expected)
+    })
+}
+
+const visibleInputs = computed(() => {
+    const hiddenSet = new Set((props.hiddenKeys || []).map((key) => String(key)))
+    return (props.inputs || []).filter((input) => {
+        if (hiddenSet.has(String(input.key))) return false
+        return matchesVisibleWhen(input.schema?.visible_when)
+    })
+})
+
+const enumOptions = (input: InputDef): any[] => {
+    if (Array.isArray(input.schema?.enum)) {
+        return input.schema?.enum || []
+    }
+    return []
+}
+
+const hasEnumOptions = (input: InputDef): boolean => {
+    return enumOptions(input).length > 0
+}
+
+const ensureSelectDefaults = () => {
+    for (const input of props.inputs || []) {
+        if (!(input.schema?.param_type === 'select' || hasEnumOptions(input))) {
+            continue
+        }
+        const current = props.values?.[input.key]
+        if (current !== undefined && current !== null && String(current) !== '') {
+            continue
+        }
+        const options = enumOptions(input)
+        if (options.length > 0) {
+            updateValue(input.key, String(options[0]))
+        }
+    }
+}
+
+watch(
+    () => props.inputs,
+    () => {
+        ensureSelectDefaults()
+    },
+    { immediate: true, deep: true }
+)
+
+watch(
+    () => props.values,
+    () => {
+        ensureSelectDefaults()
+    },
+    { deep: true }
+)
 
 const updateValue = (key: string, value: any) => {
     emit('update:values', key, value)
