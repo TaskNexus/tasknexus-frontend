@@ -45,6 +45,47 @@
             :mappings="nodeOutputMappings"
             @update:mappings="(mappings) => { nodeOutputMappings = mappings; updateOutputs(); }"
         />
+        <section v-if="isComponentNode" class="space-y-3 border-t border-gray-100 pt-4">
+            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">模板</h4>
+
+            <div class="space-y-1">
+                <label class="text-xs font-medium text-gray-600">保存为新模板</label>
+                <div class="flex items-center gap-2">
+                    <input
+                      v-model="newTemplateName"
+                      class="flex-1 px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500"
+                      placeholder="输入模板名称"
+                    />
+                    <button
+                      class="px-3 py-2 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                      :disabled="savingTemplate || !newTemplateName.trim()"
+                      @click="saveAsTemplate"
+                    >
+                        保存
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-xs font-medium text-gray-600">覆盖已有模板</label>
+                <div class="flex items-center gap-2">
+                    <select
+                      v-model="selectedTemplateId"
+                      class="flex-1 px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
+                    >
+                        <option :value="null" disabled>请选择模板</option>
+                        <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
+                    </select>
+                    <button
+                      class="px-3 py-2 text-xs rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                      :disabled="savingTemplate || selectedTemplateId === null"
+                      @click="overwriteTemplateBySelection"
+                    >
+                        覆盖
+                    </button>
+                </div>
+            </div>
+        </section>
         <p v-if="subprocessCleanupNotice" class="text-xs text-amber-600">
             {{ subprocessCleanupNotice }}
         </p>
@@ -55,6 +96,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import axios from 'axios'
+import { createTemplate, listTemplates, updateTemplate, type ComponentNodeTemplate } from '@/api/componentTemplates'
 import {
     SubProcessSettings,
     BasicInfoSettings,
@@ -67,12 +109,19 @@ const props = defineProps<{
     node: any,
     projectId?: number | string
 }>()
+const emit = defineEmits<{
+    (e: 'templates-updated'): void
+}>()
 
 const nodeData = ref<any>({})
 const nodeInputs = ref<any>({})
 const nodeOutputMappings = ref<Record<string, string>>({})
 const subprocessOutputs = ref<Array<{ key: string; name: string; type: string }>>([])
 const subprocessCleanupNotice = ref('')
+const templates = ref<ComponentNodeTemplate[]>([])
+const newTemplateName = ref('')
+const selectedTemplateId = ref<number | null>(null)
+const savingTemplate = ref(false)
 
 // AI Model Configuration
 interface ModelGroup {
@@ -88,6 +137,10 @@ const builtinSubprocessOutputKeys = new Set(['_loop', '_inner_loop'])
 
 const isSubProcessNode = computed(() => {
     return nodeData.value.type === 'SUBPROCESS' || nodeData.value.type === 'subprocess'
+})
+
+const isComponentNode = computed(() => {
+    return !!nodeData.value.componentCode && !isSubProcessNode.value
 })
 
 const effectiveOutputs = computed(() => {
@@ -122,6 +175,86 @@ const fetchComponentDefinitions = async () => {
     }
 }
 
+const TEMPLATE_NODE_KEYS = [
+    'label',
+    'type',
+    'icon',
+    'componentCode',
+    'version',
+    'componentInputs',
+    'componentOutputs',
+    'inputs',
+    'outputs',
+    'errorIgnorable',
+    'skippable',
+    'retryable',
+]
+
+const extractTemplateNodeData = (): Record<string, any> => {
+    const raw = (props.node?.getData?.() || {}) as Record<string, any>
+    const payload: Record<string, any> = {}
+    TEMPLATE_NODE_KEYS.forEach((k) => {
+        if (raw[k] !== undefined) {
+            payload[k] = raw[k]
+        }
+    })
+    return payload
+}
+
+const notifyTemplateUpdated = () => {
+    emit('templates-updated')
+    window.dispatchEvent(new CustomEvent('component-template-updated'))
+}
+
+const fetchTemplatesList = async () => {
+    try {
+        templates.value = await listTemplates()
+        if (selectedTemplateId.value !== null) {
+            const hit = templates.value.some((tpl) => tpl.id === selectedTemplateId.value)
+            if (!hit) {
+                selectedTemplateId.value = null
+            }
+        }
+    } catch (e) {
+        console.error('Failed to fetch templates', e)
+    }
+}
+
+const saveAsTemplate = async () => {
+    if (!isComponentNode.value) return
+    const name = newTemplateName.value.trim()
+    if (!name) return
+
+    savingTemplate.value = true
+    try {
+        await createTemplate(name, extractTemplateNodeData())
+        newTemplateName.value = ''
+        await fetchTemplatesList()
+        notifyTemplateUpdated()
+    } catch (e: any) {
+        console.error('Failed to create template', e)
+        alert(e?.response?.data?.detail || '保存模板失败')
+    } finally {
+        savingTemplate.value = false
+    }
+}
+
+const overwriteTemplateBySelection = async () => {
+    if (!isComponentNode.value || selectedTemplateId.value === null) return
+
+    savingTemplate.value = true
+    try {
+        await updateTemplate(selectedTemplateId.value, { node_data: extractTemplateNodeData() })
+        await fetchTemplatesList()
+        notifyTemplateUpdated()
+    } catch (e: any) {
+        console.error('Failed to overwrite template', e)
+        alert(e?.response?.data?.detail || '覆盖模板失败')
+    } finally {
+        savingTemplate.value = false
+    }
+}
+
 const syncFromNode = () => {
     if (!props.node) return
     const data = props.node.getData() || {}
@@ -129,6 +262,9 @@ const syncFromNode = () => {
     nodeInputs.value = { ...data.inputs }
     subprocessOutputs.value = []
     subprocessCleanupNotice.value = ''
+    if (!newTemplateName.value.trim()) {
+        newTemplateName.value = data.label || data.componentCode || ''
+    }
     
     // Sync output mappings from node's outputs array
     nodeOutputMappings.value = {}
@@ -279,5 +415,6 @@ watch(() => props.projectId, () => {
 
 onMounted(() => {
     fetchComponentDefinitions()
+    fetchTemplatesList()
 })
 </script>

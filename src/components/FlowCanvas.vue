@@ -234,24 +234,33 @@ const portGroups = {
     },
 }
 
+const cloneData = (value: any) => {
+    try {
+        return JSON.parse(JSON.stringify(value))
+    } catch {
+        return value
+    }
+}
+
 const handleStartDrag = (node: any, e: MouseEvent) => {
     if (!graph.value || !dnd.value || props.readOnly) return
 
-    const nodeType = node.type.toUpperCase()
+    const templateData = node?.isTemplate && node?.nodeData && typeof node.nodeData === 'object'
+        ? cloneData(node.nodeData)
+        : null
+    const nodeType = String(templateData?.type || node.type || 'CUSTOM').toUpperCase()
     const GATEWAY_TYPES = ['BRANCH', 'PARALLEL', 'CONVERGE', 'CONDITIONAL']
     const isGateway = GATEWAY_TYPES.includes(nodeType)
 
-    // Use different shape for gateways
     const shape = isGateway ? 'gateway-node' : 'standard-node'
-    
-    // Gateway ports position on diamond corners
+
     const gatewayPortItems = [
         { group: 'top' },
         { group: 'right' },
         { group: 'bottom' },
         { group: 'left' },
     ]
-    
+
     const standardPortItems = [
         { group: 'top' },
         { group: 'right' },
@@ -259,26 +268,57 @@ const handleStartDrag = (node: any, e: MouseEvent) => {
         { group: 'left' },
     ]
 
-    // Create a node based on the dragged item
+    const defaultData = {
+        label: node.label,
+        type: nodeType,
+        icon: node.iconName || 'Component',
+        status: 'default',
+        componentCode: node.componentCode,
+        version: node.version,
+        componentInputs: node.inputs,
+        componentOutputs: node.outputs,
+        inputs: {},
+        outputs: [],
+        errorIgnorable: false,
+        skippable: true,
+        retryable: true,
+    }
+
+    const data = templateData
+        ? {
+            ...defaultData,
+            ...templateData,
+            label: templateData.label || defaultData.label,
+            type: nodeType,
+            icon: templateData.icon || defaultData.icon,
+            status: 'default',
+            componentCode: templateData.componentCode || defaultData.componentCode,
+            version: templateData.version || defaultData.version,
+            componentInputs: Array.isArray(templateData.componentInputs)
+                ? templateData.componentInputs
+                : (defaultData.componentInputs || []),
+            componentOutputs: Array.isArray(templateData.componentOutputs)
+                ? templateData.componentOutputs
+                : (defaultData.componentOutputs || []),
+            inputs: templateData.inputs && typeof templateData.inputs === 'object'
+                ? templateData.inputs
+                : {},
+            outputs: Array.isArray(templateData.outputs) ? templateData.outputs : [],
+            errorIgnorable: !!templateData.errorIgnorable,
+            skippable: templateData.skippable !== false,
+            retryable: templateData.retryable !== false,
+        }
+        : defaultData
+
     const x6Node = graph.value.createNode({
         shape: shape,
         ports: {
             groups: portGroups,
             items: isGateway ? gatewayPortItems : standardPortItems
         },
-        data: {
-            label: node.label,
-            type: nodeType,
-            icon: node.iconName || 'Component',
-            status: 'default',
-            componentCode: node.componentCode,
-            version: node.version,
-            componentInputs: node.inputs,
-            componentOutputs: node.outputs,
-            inputs: {}
-        }
+        data: data
     })
-    
+
     dnd.value.start(x6Node, e)
 }
 
