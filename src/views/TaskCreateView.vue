@@ -259,6 +259,31 @@
                                 </div>
                             </template>
 
+                            <template v-else-if="param.inputType === 'client-agent'">
+                                <div class="space-y-1">
+                                    <select
+                                      v-model="param.runtimeValue"
+                                      class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 text-sm border bg-white"
+                                      :disabled="loadingRegisteredClientAgents"
+                                    >
+                                        <option value="">{{ loadingRegisteredClientAgents ? '加载客户端代理中...' : '请选择客户端代理' }}</option>
+                                        <option
+                                          v-for="agent in registeredClientAgents"
+                                          :key="`client-agent-${agent.id}`"
+                                          :value="getClientAgentMachineName(agent)"
+                                        >
+                                            {{ getClientAgentDisplayLabel(agent) }}
+                                        </option>
+                                    </select>
+                                    <p v-if="!loadingRegisteredClientAgents && registeredClientAgents.length === 0" class="text-xs text-orange-500">
+                                        暂无已注册客户端代理
+                                    </p>
+                                    <p v-else-if="loadedRegisteredClientAgents && !param.runtimeValue" class="text-xs text-gray-500">
+                                        请选择客户端代理机器名
+                                    </p>
+                                </div>
+                            </template>
+
                             <template v-else>
                                 <input 
                                   v-model="param.runtimeValue" 
@@ -517,6 +542,9 @@ watch(feishuNotifyEnabled, (val) => {
 
 // Params
 const allParams = ref<ParamItem[]>([])
+const registeredClientAgents = ref<RegisteredClientAgent[]>([])
+const loadingRegisteredClientAgents = ref(false)
+const loadedRegisteredClientAgents = ref(false)
 
 // UI State
 const loading = ref(false)
@@ -534,7 +562,13 @@ const taskTypes = [
     { label: 'Webhook', value: 'webhook' }
 ]
 
-type ParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select' | 'toggle'
+type ParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select' | 'toggle' | 'client-agent'
+
+interface RegisteredClientAgent {
+    id: number
+    name: string
+    status: string
+}
 
 interface ParamOption {
     value: string
@@ -571,6 +605,7 @@ const paramTypeLabels: Record<ParamInputType, string> = {
     'single-select': '单选',
     'multi-select': '多选',
     toggle: '开关',
+    'client-agent': '客户端代理',
 }
 
 interface FeishuUserOption {
@@ -607,10 +642,56 @@ const isValid = computed(() => {
 })
 
 const normalizeInputType = (inputType: any): ParamInputType => {
-    if (inputType === 'git-branch' || inputType === 'single-select' || inputType === 'multi-select' || inputType === 'toggle') {
+    if (
+        inputType === 'git-branch' ||
+        inputType === 'single-select' ||
+        inputType === 'multi-select' ||
+        inputType === 'toggle' ||
+        inputType === 'client-agent'
+    ) {
         return inputType
     }
     return 'text'
+}
+
+const getClientAgentDisplayLabel = (agent: RegisteredClientAgent) => {
+    const name = String(agent.name || '').trim()
+    const status = String(agent.status || '').trim()
+    return `${name || `Agent #${agent.id}`}${status ? `（${status}）` : ''}`
+}
+
+const getClientAgentMachineName = (agent: RegisteredClientAgent): string => {
+    return String(agent.name || '').trim()
+}
+
+const getValidClientAgentNames = () => {
+    return new Set(
+        registeredClientAgents.value
+            .map((agent) => getClientAgentMachineName(agent))
+            .filter(Boolean)
+    )
+}
+
+const findClientAgentByMachineName = (value: any): RegisteredClientAgent | undefined => {
+    const normalized = String(value ?? '').trim()
+    if (!normalized) return undefined
+    return registeredClientAgents.value.find((agent) => getClientAgentMachineName(agent) === normalized)
+}
+
+const normalizeClientAgentValue = (value: any): string => {
+    const normalized = String(value ?? '').trim()
+    if (!normalized) return ''
+
+    if (!loadedRegisteredClientAgents.value) {
+        return normalized
+    }
+
+    const validAgentNames = getValidClientAgentNames()
+    if (!validAgentNames.has(normalized)) {
+        return ''
+    }
+
+    return normalized
 }
 
 const normalizeToggleValue = (value: any): 0 | 1 => {
@@ -663,6 +744,10 @@ const normalizeParamValueByType = (inputType: ParamInputType, value: any, option
         return normalizeToggleValue(value)
     }
 
+    if (inputType === 'client-agent') {
+        return normalizeClientAgentValue(value)
+    }
+
     const normalized = String(value ?? '')
     if (inputType === 'single-select' && normalized) {
         const optionSet = new Set(options.map((opt) => opt.value))
@@ -703,6 +788,13 @@ const formatParamDefaultValue = (param: ParamItem) => {
     if (param.inputType === 'toggle') {
         return Number(param.value) === 1 ? '开启 (1)' : '关闭 (0)'
     }
+    if (param.inputType === 'client-agent') {
+        const agent = findClientAgentByMachineName(param.value)
+        if (agent) {
+            return getClientAgentDisplayLabel(agent)
+        }
+        return String(param.value ?? '')
+    }
     if (Array.isArray(param.value)) {
         return param.value.length ? param.value.join(', ') : '[]'
     }
@@ -736,6 +828,9 @@ const getContextValue = (param: ParamItem) => {
     }
     if (param.inputType === 'toggle') {
         return normalizeToggleValue(param.runtimeValue)
+    }
+    if (param.inputType === 'client-agent') {
+        return normalizeClientAgentValue(param.runtimeValue)
     }
     return String(param.runtimeValue ?? '')
 }
@@ -990,7 +1085,10 @@ onMounted(async () => {
         feishuNotifyEnabled.value = true
         await fetchCurrentUserFeishuStatus()
     }
-    await fetchWorkflows()
+    await Promise.all([
+        fetchWorkflows(),
+        fetchRegisteredClientAgents(),
+    ])
     
     if (isEditMode.value && editTaskId.value) {
         await loadTaskForEdit()
@@ -1110,6 +1208,46 @@ const fetchWorkflows = async () => {
         workflows.value = await fetchAllPages('/api/workflows/')
     } catch (e) {
         console.error("Failed to fetch workflows", e)
+    }
+}
+
+const fetchRegisteredClientAgents = async () => {
+    loadingRegisteredClientAgents.value = true
+    loadedRegisteredClientAgents.value = false
+    try {
+        const agents = await fetchAllPages<any>('/api/client-agents/agents/')
+        const deduped = new Map<number, RegisteredClientAgent>()
+        agents.forEach((raw) => {
+            const id = Number(raw?.id)
+            if (!Number.isFinite(id)) return
+            const name = String(raw?.name ?? '').trim()
+            if (!name) return
+            deduped.set(id, {
+                id,
+                name,
+                status: String(raw?.status ?? ''),
+            })
+        })
+        registeredClientAgents.value = Array.from(deduped.values())
+            .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') || a.id - b.id)
+        loadedRegisteredClientAgents.value = true
+
+        allParams.value.forEach((param) => {
+            if (param.inputType !== 'client-agent') return
+            param.value = normalizeClientAgentValue(param.value)
+            param.runtimeValue = normalizeClientAgentValue(param.runtimeValue)
+        })
+    } catch (e) {
+        console.error('Failed to fetch client agents', e)
+        registeredClientAgents.value = []
+        loadedRegisteredClientAgents.value = true
+        allParams.value.forEach((param) => {
+            if (param.inputType !== 'client-agent') return
+            param.value = normalizeClientAgentValue(param.value)
+            param.runtimeValue = normalizeClientAgentValue(param.runtimeValue)
+        })
+    } finally {
+        loadingRegisteredClientAgents.value = false
     }
 }
 

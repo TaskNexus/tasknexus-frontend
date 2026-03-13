@@ -441,6 +441,33 @@
                       </div>
                   </template>
 
+                  <template v-else-if="currentWorkflowParam.input_type === 'client-agent'">
+                      <div class="space-y-1">
+                          <label class="text-[11px] font-medium text-gray-500">默认客户端代理</label>
+                          <div v-if="loadingRegisteredClientAgents" class="flex items-center gap-2 text-xs text-gray-500">
+                              <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                              <span>正在加载客户端代理...</span>
+                          </div>
+                          <select
+                            v-else
+                            v-model="currentWorkflowParam.value"
+                            class="w-full text-xs border-gray-200 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none bg-white"
+                          >
+                              <option value="">请选择客户端代理（可选）</option>
+                              <option
+                                v-for="agent in registeredClientAgents"
+                                :key="`client-agent-${agent.id}`"
+                                :value="getClientAgentMachineName(agent)"
+                              >
+                                  {{ getClientAgentDisplayLabel(agent) }}
+                              </option>
+                          </select>
+                          <p v-if="!loadingRegisteredClientAgents && registeredClientAgents.length === 0" class="text-[11px] text-orange-500">
+                              暂无已注册客户端代理
+                          </p>
+                      </div>
+                  </template>
+
                   <template v-else-if="currentWorkflowParam.input_type === 'single-select' || currentWorkflowParam.input_type === 'multi-select'">
                       <div class="space-y-2">
                           <div class="flex items-center justify-between">
@@ -911,6 +938,13 @@ type VarsSubPage = 'global' | 'workflow-list' | 'workflow-detail'
 const varsSubPage = ref<VarsSubPage>('global')
 
 const availableTags = ref<string[]>([])
+interface RegisteredClientAgent {
+    id: number
+    name: string
+    status: string
+}
+const registeredClientAgents = ref<RegisteredClientAgent[]>([])
+const loadingRegisteredClientAgents = ref(false)
 
 const roleLabelMap: Record<string, string> = {
     OWNER: 'Owner',
@@ -920,6 +954,19 @@ const roleLabelMap: Record<string, string> = {
 }
 
 const getRoleLabel = (role: string) => roleLabelMap[role] || role
+const getClientAgentDisplayLabel = (agent: RegisteredClientAgent) => {
+    const name = String(agent.name || '').trim()
+    const status = String(agent.status || '').trim()
+    return `${name || `Agent #${agent.id}`}${status ? `（${status}）` : ''}`
+}
+const getClientAgentMachineName = (agent: RegisteredClientAgent) => String(agent.name || '').trim()
+const getValidClientAgentNames = () => {
+    return new Set(
+        registeredClientAgents.value
+            .map((agent) => getClientAgentMachineName(agent))
+            .filter(Boolean)
+    )
+}
 
 const toggleVisibleRole = (role: string) => {
     const idx = visibleRoles.value.indexOf(role)
@@ -985,6 +1032,76 @@ const fetchProjectParams = async () => {
     }
 }
 
+const fetchRegisteredClientAgents = async () => {
+    loadingRegisteredClientAgents.value = true
+    try {
+        const allAgents: any[] = []
+        let page = 1
+        const pageSize = 200
+        while (page <= 100) {
+            const resp = await axios.get('/api/client-agents/agents/', {
+                params: {
+                    page,
+                    page_size: pageSize
+                }
+            })
+            const data = resp.data
+            if (Array.isArray(data)) {
+                allAgents.push(...data)
+                break
+            }
+
+            const chunk = Array.isArray(data?.results) ? data.results : []
+            allAgents.push(...chunk)
+
+            const total = Number(data?.count)
+            if (!Number.isFinite(total)) {
+                if (!data?.next || chunk.length === 0) {
+                    break
+                }
+            } else if (allAgents.length >= total || chunk.length === 0) {
+                break
+            }
+            page += 1
+        }
+
+        const deduped = new Map<number, RegisteredClientAgent>()
+        allAgents.forEach((raw: any) => {
+            const id = Number(raw?.id)
+            if (!Number.isFinite(id)) return
+            const name = String(raw?.name ?? '').trim()
+            if (!name) return
+            deduped.set(id, {
+                id,
+                name,
+                status: String(raw?.status ?? ''),
+            })
+        })
+        registeredClientAgents.value = Array.from(deduped.values())
+            .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') || a.id - b.id)
+
+        const validAgentNames = getValidClientAgentNames()
+        workflowParams.value.forEach((param) => {
+            if (param.input_type !== 'client-agent') return
+            const currentValue = String(param.value ?? '').trim()
+            if (!currentValue) {
+                param.value = ''
+                return
+            }
+            if (!validAgentNames.has(currentValue)) {
+                param.value = ''
+                return
+            }
+            param.value = currentValue
+        })
+    } catch (e) {
+        console.error('Failed to fetch registered client agents', e)
+        registeredClientAgents.value = []
+    } finally {
+        loadingRegisteredClientAgents.value = false
+    }
+}
+
 // Watch activePanel to load params when 'vars' opens.
 // Also watch selectedProjectId.
 watch(activePanel, (newVal, oldVal) => {
@@ -992,6 +1109,7 @@ watch(activePanel, (newVal, oldVal) => {
         fetchProjectParams()
     }
     if (newVal === 'vars') {
+        fetchRegisteredClientAgents()
         if (oldVal !== 'vars') {
             varsSubPage.value = 'global'
         }
@@ -1026,7 +1144,7 @@ const toggleParam = (key: string) => {
 }
 
 // Workflow Local Params State
-type WorkflowParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select' | 'toggle'
+type WorkflowParamInputType = 'text' | 'git-branch' | 'single-select' | 'multi-select' | 'toggle' | 'client-agent'
 
 interface WorkflowParamOption {
     value: string
@@ -1053,6 +1171,7 @@ const workflowParamTypes: Array<{ value: WorkflowParamInputType; label: string }
     { value: 'single-select', label: '单选' },
     { value: 'multi-select', label: '多选' },
     { value: 'toggle', label: '开关' },
+    { value: 'client-agent', label: '客户端代理' },
 ]
 
 const createDefaultWorkflowParam = (): WorkflowParam => ({
@@ -1158,6 +1277,24 @@ const onWorkflowParamTypeChange = (param: WorkflowParam) => {
 
     if (param.input_type === 'toggle') {
         param.value = normalizeToggleValue(param.value)
+        return
+    }
+
+    if (param.input_type === 'client-agent') {
+        if (!registeredClientAgents.value.length && !loadingRegisteredClientAgents.value) {
+            void fetchRegisteredClientAgents()
+        }
+        const normalizedValue = Array.isArray(param.value) ? '' : String(param.value ?? '').trim()
+        if (!normalizedValue) {
+            param.value = ''
+            return
+        }
+        const validAgentNames = getValidClientAgentNames()
+        if (!validAgentNames.has(normalizedValue)) {
+            param.value = ''
+            return
+        }
+        param.value = normalizedValue
         return
     }
 
@@ -1393,6 +1530,11 @@ const normalizeWorkflowParamsForSave = (): WorkflowParam[] => {
                 if (param.value && !validValues.has(param.value)) {
                     param.value = ''
                 }
+            } else if (param.input_type === 'client-agent') {
+                const validAgentNames = getValidClientAgentNames()
+                if (param.value && !validAgentNames.has(param.value)) {
+                    param.value = ''
+                }
             }
         }
         return param
@@ -1441,6 +1583,16 @@ const validateWorkflowParamsForSave = (params: WorkflowParam[]): string[] => {
                 const invalidValues = values.filter((v) => !optionValueSet.has(v))
                 if (invalidValues.length) {
                     errors.push(`${label}（${param.key}）多选默认值存在无效选项`)
+                }
+            }
+        }
+
+        if (param.input_type === 'client-agent') {
+            const value = String(param.value || '')
+            if (value) {
+                const validAgentNames = getValidClientAgentNames()
+                if (!validAgentNames.has(value)) {
+                    errors.push(`${label}（${param.key}）默认客户端代理无效`)
                 }
             }
         }

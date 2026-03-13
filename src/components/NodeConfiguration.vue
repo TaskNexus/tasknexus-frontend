@@ -29,6 +29,7 @@
             :param-values="nodeInputs"
             @update:modelValue="(val) => { nodeInputs['workflow_id'] = val; updateInputs(); }"
             @update:paramValues="(key, val) => { nodeInputs[key] = val; updateInputs(); }"
+            @paramsLoaded="handleSubprocessParamsLoaded"
             @subprocessOutputsLoaded="handleSubprocessOutputsLoaded"
         />
 
@@ -89,6 +90,9 @@
         <p v-if="subprocessCleanupNotice" class="text-xs text-amber-600">
             {{ subprocessCleanupNotice }}
         </p>
+        <p v-if="subprocessParamCleanupNotice" class="text-xs text-amber-600">
+            {{ subprocessParamCleanupNotice }}
+        </p>
     </div>
   </div>
 </template>
@@ -118,6 +122,7 @@ const nodeInputs = ref<any>({})
 const nodeOutputMappings = ref<Record<string, string>>({})
 const subprocessOutputs = ref<Array<{ key: string; name: string; type: string }>>([])
 const subprocessCleanupNotice = ref('')
+const subprocessParamCleanupNotice = ref('')
 const templates = ref<ComponentNodeTemplate[]>([])
 const newTemplateName = ref('')
 const selectedTemplateId = ref<number | null>(null)
@@ -262,6 +267,7 @@ const syncFromNode = () => {
     nodeInputs.value = { ...data.inputs }
     subprocessOutputs.value = []
     subprocessCleanupNotice.value = ''
+    subprocessParamCleanupNotice.value = ''
     if (!newTemplateName.value.trim()) {
         newTemplateName.value = data.label || data.componentCode || ''
     }
@@ -321,6 +327,38 @@ const cleanupInvalidSubprocessMappings = (allowedOutputs: Array<{ key: string }>
 const handleSubprocessOutputsLoaded = (outputs: Array<{ key: string; name: string; type: string }>) => {
     subprocessOutputs.value = outputs
     cleanupInvalidSubprocessMappings(outputs)
+}
+
+const cleanupInvalidSubprocessParamInputs = (params: Array<{ key: string }>) => {
+    if (!isSubProcessNode.value) return
+
+    const allowedParamInputKeys = new Set(
+        (Array.isArray(params) ? params : [])
+            .map((param) => String(param?.key || '').trim())
+            .filter(Boolean)
+            .map((key) => `params_${key}`)
+    )
+
+    const removedKeys: string[] = []
+    for (const key of Object.keys(nodeInputs.value || {})) {
+        if (!key.startsWith('params_')) continue
+        if (!allowedParamInputKeys.has(key)) {
+            delete nodeInputs.value[key]
+            removedKeys.push(key)
+        }
+    }
+
+    if (removedKeys.length === 0) {
+        subprocessParamCleanupNotice.value = ''
+        return
+    }
+
+    subprocessParamCleanupNotice.value = `已移除与当前子流程不匹配的参数映射：${removedKeys.join(', ')}`
+    updateInputs()
+}
+
+const handleSubprocessParamsLoaded = (params: Array<{ key: string }>) => {
+    cleanupInvalidSubprocessParamInputs(params)
 }
 
 const updateSchemaFromLatest = () => {
