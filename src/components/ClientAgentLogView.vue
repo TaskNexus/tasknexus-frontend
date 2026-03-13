@@ -227,6 +227,11 @@ interface LogContentResponse {
   content: string
 }
 
+interface LiveLogUpdate {
+  line: LogLine
+  replaceLast: boolean
+}
+
 const DEFAULT_WINDOW_BYTES = 256 * 1024
 const SCROLL_WINDOW_BYTES = 64 * 1024
 const MAX_LINES_IN_MEMORY = 3000
@@ -285,7 +290,7 @@ const downloadingLog = ref(false)
 const logFontSizePx = ref(14)
 const logFontSizeOptions = LOG_FONT_SIZE_OPTIONS
 
-const liveQueue: LogLine[] = []
+const liveQueue: LiveLogUpdate[] = []
 const textEncoder = new TextEncoder()
 let lineIdSeed = 0
 let flushTimer: ReturnType<typeof setTimeout> | null = null
@@ -483,26 +488,17 @@ const splitWindowTextToLines = (text: string, windowStart: number): LogLine[] =>
   return result
 }
 
-const splitLivePayloadToLines = (payload: string, isStderr: boolean): LogLine[] => {
-  if (nextLiveByteCursor === null) {
-    return payload.split('\n').map((line) => createLine(line, isStderr))
+const createLiveLine = (text: string, isStderr: boolean, lineComplete: boolean): LogLine => {
+  if (!lineComplete || nextLiveByteCursor === null) {
+    return createLine(text, isStderr)
   }
 
-  const result: LogLine[] = []
-  let cursor = nextLiveByteCursor
-  const rawLines = payload.split('\n')
-
-  for (const line of rawLines) {
-    const bytes = textEncoder.encode(line).length
-    const lineStart = cursor
-    const lineEnd = lineStart + bytes
-    const byteAfter = lineEnd + 1
-    result.push(createLine(line, isStderr, lineStart, lineEnd, byteAfter))
-    cursor = byteAfter
-  }
-
-  nextLiveByteCursor = cursor
-  return result
+  const bytes = textEncoder.encode(text).length
+  const lineStart = nextLiveByteCursor
+  const lineEnd = lineStart + bytes
+  const byteAfter = lineEnd + 1
+  nextLiveByteCursor = byteAfter
+  return createLine(text, isStderr, lineStart, lineEnd, byteAfter)
 }
 
 const syncOffsetRangeFromVisibleLines = () => {
@@ -823,11 +819,40 @@ const scheduleLiveFlush = () => {
 
     const pending = liveQueue.splice(0, LIVE_MAX_LINES_PER_FLUSH)
     const atBottom = isNearBottom()
+    const committedLines: LogLine[] = []
+    let appendedLine = false
 
-    logLines.value.push(...pending)
-    applyMemoryLimit('append', { skipSync: true })
+    for (const update of pending) {
+      if (update.replaceLast && logLines.value.length > 0) {
+        const lastIndex = logLines.value.length - 1
+        const previous = logLines.value[lastIndex]
+        if (!previous) continue
+
+        logLines.value[lastIndex] = {
+          ...update.line,
+          id: previous.id,
+          highlight: previous.highlight,
+        }
+        if (update.line.byteAfter !== undefined) {
+          committedLines.push(logLines.value[lastIndex])
+        }
+        continue
+      }
+
+      logLines.value.push(update.line)
+      appendedLine = true
+      if (update.line.byteAfter !== undefined) {
+        committedLines.push(update.line)
+      }
+    }
+
+    if (appendedLine) {
+      applyMemoryLimit('append', { skipSync: true })
+    }
     syncOffsetsFromVisibleEdges()
-    updateAvgBytesFromChunk(pending)
+    if (committedLines.length > 0) {
+      updateAvgBytesFromChunk(committedLines)
+    }
     refreshWindowFlags()
     hasMoreForward.value = false
 
@@ -841,8 +866,16 @@ const scheduleLiveFlush = () => {
   }, LIVE_FLUSH_INTERVAL_MS)
 }
 
-const enqueueLiveLine = (line: string, isStderr: boolean) => {
-  liveQueue.push(...splitLivePayloadToLines(line, isStderr))
+const enqueueLiveUpdate = (
+  line: string,
+  isStderr: boolean,
+  replaceLast: boolean,
+  lineComplete: boolean
+) => {
+  liveQueue.push({
+    line: createLiveLine(line, isStderr, lineComplete),
+    replaceLast,
+  })
   scheduleLiveFlush()
 }
 
@@ -1049,7 +1082,9 @@ const connectWs = () => {
 
       if (data.type === 'log') {
         const lineText = typeof data.line === 'string' ? data.line : ''
-        enqueueLiveLine(lineText, Boolean(data.is_stderr))
+        const replaceLast = Boolean(data.replace_last)
+        const lineComplete = data.line_complete !== false
+        enqueueLiveUpdate(lineText, Boolean(data.is_stderr), replaceLast, lineComplete)
 
         if (data.finished) {
           finished.value = true
