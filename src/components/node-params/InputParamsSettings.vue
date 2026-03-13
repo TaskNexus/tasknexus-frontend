@@ -40,9 +40,18 @@
                 @update:model-value="(val) => updateValue(input.key, val)"
             />
 
+            <EditableSelectInput
+                v-else-if="input.schema?.param_type === 'editable_select'"
+                :model-value="values[input.key] || ''"
+                :options="enumOptions(input)"
+                placeholder="请输入机器名称"
+                select-placeholder="选择机器"
+                @update:model-value="(val) => updateValue(input.key, val)"
+            />
+
             <!-- Select -->
             <select
-                v-else-if="input.schema?.param_type === 'select' || hasEnumOptions(input)"
+                v-else-if="isPlainSelectInput(input)"
                 :value="values[input.key] || ''"
                 class="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
                 @change="(event) => updateValue(input.key, (event.target as HTMLSelectElement).value)"
@@ -115,7 +124,8 @@ import {
     CodeEditorInput,
     BooleanCheckbox,
     DefaultTextInput,
-    ObjectArrayInput
+    ObjectArrayInput,
+    EditableSelectInput
 } from './inputs'
 
 interface InputDef {
@@ -193,13 +203,20 @@ const hasEnumOptions = (input: InputDef): boolean => {
     return enumOptions(input).length > 0
 }
 
+const isPlainSelectInput = (input: InputDef): boolean => {
+    if (input.schema?.param_type === 'editable_select') {
+        return false
+    }
+    return input.schema?.param_type === 'select' || hasEnumOptions(input)
+}
+
 function updateValue(key: string, value: any) {
     emit('update:values', key, value)
 }
 
 const ensureSelectDefaults = () => {
     for (const input of props.inputs || []) {
-        if (!(input.schema?.param_type === 'select' || hasEnumOptions(input))) {
+        if (!isPlainSelectInput(input)) {
             continue
         }
         const current = props.values?.[input.key]
