@@ -148,6 +148,14 @@
           </div>
 
           <div
+            v-if="shouldRenderActiveLine && activeLine"
+            class="h-6 log-line opacity-80 italic"
+            :class="activeLine.isStderr ? 'text-red-600' : 'text-gray-500'"
+          >
+            {{ activeLine.text }}
+          </div>
+
+          <div
             v-if="droppedTailLines > 0"
             class="py-1.5 px-2 mt-2 rounded bg-amber-50 border border-amber-200 text-amber-700 text-xs"
           >
@@ -232,6 +240,13 @@ interface LiveLogUpdate {
   replaceLast: boolean
 }
 
+interface ActiveLinePayload {
+  seq: number
+  text: string
+  isStderr: boolean
+  baseOffset: number
+}
+
 const DEFAULT_WINDOW_BYTES = 256 * 1024
 const SCROLL_WINDOW_BYTES = 64 * 1024
 const MAX_LINES_IN_MEMORY = 3000
@@ -261,6 +276,8 @@ const connecting = ref(false)
 const wsConnected = ref(false)
 const finished = ref(false)
 const taskStatus = ref('')
+const activeLine = ref<ActiveLinePayload | null>(null)
+const lastActiveSeq = ref(0)
 
 const fileSize = ref(0)
 const earliestOffset = ref(0)
@@ -317,6 +334,13 @@ const lineCountText = computed(() => {
   const trimmed = droppedHeadLines.value + droppedTailLines.value
   if (trimmed === 0) return `${logLines.value.length}`
   return `${logLines.value.length} visible (+${trimmed} trimmed)`
+})
+
+const shouldRenderActiveLine = computed(() => {
+  if (!activeLine.value) return false
+  if (activeLine.value.baseOffset !== fileSize.value) return false
+  if (loadedEndOffset.value < fileSize.value) return false
+  return autoScroll.value || isNearBottom()
 })
 
 const topVirtualSpacerPx = computed(() => {
@@ -573,8 +597,8 @@ const updateAvgBytesFromChunk = (lines: LogLine[]) => {
   avgBytesPerLine.value = Math.max(1, avgBytesPerLine.value * 0.85 + sampleAvg * 0.15)
 }
 
-const scheduleScrollToBottom = () => {
-  if (!autoScroll.value || !logContainerRef.value) return
+const scheduleScrollToBottom = (force = false) => {
+  if ((!autoScroll.value && !force) || !logContainerRef.value) return
   if (scrollRafId !== null) return
 
   scrollRafId = window.requestAnimationFrame(() => {
@@ -632,17 +656,63 @@ const syncTaskStatus = (status: string | undefined) => {
   if (!status) return
   taskStatus.value = status
   finished.value = TERMINAL_STATUSES.has(status)
+  if (finished.value) {
+    activeLine.value = null
+  }
+}
+
+const pruneStaleActiveLine = () => {
+  if (!activeLine.value) return
+  if (activeLine.value.baseOffset !== fileSize.value) {
+    activeLine.value = null
+  }
+}
+
+const applyActiveLineSnapshot = (
+  payload:
+    | (Partial<ActiveLinePayload> & { is_stderr?: boolean; base_offset?: number })
+    | null
+    | undefined
+) => {
+  if (!payload) {
+    activeLine.value = null
+    return
+  }
+
+  const seq = Number(payload.seq ?? 0)
+  if (seq <= lastActiveSeq.value) {
+    return
+  }
+
+  lastActiveSeq.value = seq
+  activeLine.value = {
+    seq,
+    text: String(payload.text ?? ''),
+    isStderr: Boolean(payload.isStderr ?? payload.is_stderr ?? false),
+    baseOffset: Number(payload.baseOffset ?? payload.base_offset ?? 0),
+  }
+}
+
+const clearActiveLineSnapshot = (seq?: number) => {
+  if (seq !== undefined && seq < lastActiveSeq.value) {
+    return
+  }
+  if (seq !== undefined) {
+    lastActiveSeq.value = seq
+  }
+  activeLine.value = null
 }
 
 const applyWindowChunk = async (
   windowData: LogWindowResponse,
   mode: 'replace' | 'prepend' | 'append',
-  options: { scrollToBottomOnReplace?: boolean } = {}
+  options: { scrollToBottomOnReplace?: boolean; scrollToBottomOnAppend?: boolean } = {}
 ) => {
-  const { scrollToBottomOnReplace = false } = options
+  const { scrollToBottomOnReplace = false, scrollToBottomOnAppend = false } = options
   syncTaskStatus(windowData.status)
   const chunkLines = splitWindowTextToLines(windowData.text, windowData.window_start)
   fileSize.value = windowData.file_size || 0
+  pruneStaleActiveLine()
 
   if (mode === 'replace') {
     logLines.value = chunkLines
@@ -704,6 +774,11 @@ const applyWindowChunk = async (
   latestOffset.value = Math.max(latestOffset.value, windowData.window_end)
   nextLiveByteCursor = latestOffset.value
   refreshWindowFlags()
+  await nextTick()
+  syncViewportMetrics()
+  if (scrollToBottomOnAppend) {
+    scheduleScrollToBottom(true)
+  }
 }
 
 const fetchLogWindow = async (params: {
@@ -731,6 +806,8 @@ const loadInitialWindow = async () => {
   avgBytesPerLine.value = 120
   nextLiveByteCursor = null
   fileSize.value = 0
+  activeLine.value = null
+  lastActiveSeq.value = 0
 
   try {
     const data = await fetchLogWindow({ direction: 'backward', limit_bytes: DEFAULT_WINDOW_BYTES })
@@ -765,6 +842,7 @@ const loadOlderLogs = async (limitBytes = SCROLL_WINDOW_BYTES) => {
 const loadNewerLogs = async (limitBytes = SCROLL_WINDOW_BYTES) => {
   if (isLoadingNewer.value || (!hasMoreForward.value && droppedTailLines.value <= 0)) return
   isLoadingNewer.value = true
+  const shouldStickToBottom = autoScroll.value || isNearBottom()
 
   try {
     const data = await fetchLogWindow({
@@ -772,7 +850,7 @@ const loadNewerLogs = async (limitBytes = SCROLL_WINDOW_BYTES) => {
       cursor: latestOffset.value,
       limit_bytes: limitBytes,
     })
-    await applyWindowChunk(data, 'append')
+    await applyWindowChunk(data, 'append', { scrollToBottomOnAppend: shouldStickToBottom })
   } catch (error) {
     console.error('Failed to load newer logs', error)
   } finally {
@@ -1071,12 +1149,46 @@ const connectWs = () => {
       if (data.type === 'log_init') {
         taskStatus.value = data.task_status || taskStatus.value
         finished.value = TERMINAL_STATUSES.has(taskStatus.value)
+        if (typeof data.file_size === 'number') {
+          fileSize.value = data.file_size
+        }
+        applyActiveLineSnapshot(data.active_line)
         return
       }
 
       if (data.type === 'log_history') {
         taskStatus.value = data.task_status || taskStatus.value
         finished.value = TERMINAL_STATUSES.has(taskStatus.value)
+        if (typeof data.file_size === 'number') {
+          fileSize.value = data.file_size
+        }
+        applyActiveLineSnapshot(data.active_line)
+        return
+      }
+
+      if (data.type === 'log_file_update') {
+        syncTaskStatus(data.task_status)
+        if (typeof data.file_size === 'number') {
+          fileSize.value = data.file_size
+          pruneStaleActiveLine()
+          refreshWindowFlags()
+          if (loadedEndOffset.value < fileSize.value && (autoScroll.value || isNearBottom())) {
+            void loadNewerLogs()
+          }
+        }
+        return
+      }
+
+      if (data.type === 'log_active') {
+        if (finished.value) {
+          return
+        }
+        applyActiveLineSnapshot(data)
+        return
+      }
+
+      if (data.type === 'log_active_clear') {
+        clearActiveLineSnapshot(typeof data.seq === 'number' ? data.seq : undefined)
         return
       }
 
@@ -1091,6 +1203,7 @@ const connectWs = () => {
           if (data.exit_code !== undefined && data.exit_code !== null) {
             taskStatus.value = data.exit_code === 0 ? 'COMPLETED' : 'FAILED'
           }
+          activeLine.value = null
         }
       }
     } catch (error) {
