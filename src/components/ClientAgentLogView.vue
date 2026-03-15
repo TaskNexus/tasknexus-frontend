@@ -150,7 +150,7 @@
           <div
             v-if="shouldRenderActiveLine && activeLine"
             class="h-6 log-line opacity-80 italic"
-            :class="activeLine.isStderr ? 'text-red-600' : 'text-gray-500'"
+            :class="activeLine.isStderr ? 'text-sky-500' : 'text-gray-500'"
           >
             {{ activeLine.text }}
           </div>
@@ -245,6 +245,15 @@ interface ActiveLinePayload {
   text: string
   isStderr: boolean
   baseOffset: number
+}
+
+interface ActiveLineSnapshot {
+  seq?: number
+  line?: string
+  is_stderr?: boolean
+  isStderr?: boolean
+  base_offset?: number
+  baseOffset?: number
 }
 
 const DEFAULT_WINDOW_BYTES = 256 * 1024
@@ -668,12 +677,7 @@ const pruneStaleActiveLine = () => {
   }
 }
 
-const applyActiveLineSnapshot = (
-  payload:
-    | (Partial<ActiveLinePayload> & { is_stderr?: boolean; base_offset?: number })
-    | null
-    | undefined
-) => {
+const applyActiveLineSnapshot = (payload: ActiveLineSnapshot | null | undefined) => {
   if (!payload) {
     activeLine.value = null
     return
@@ -687,7 +691,7 @@ const applyActiveLineSnapshot = (
   lastActiveSeq.value = seq
   activeLine.value = {
     seq,
-    text: String(payload.text ?? ''),
+    text: String(payload.line ?? ''),
     isStderr: Boolean(payload.isStderr ?? payload.is_stderr ?? false),
     baseOffset: Number(payload.baseOffset ?? payload.base_offset ?? 0),
   }
